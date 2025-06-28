@@ -8,7 +8,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
 POINT_CHANNEL_ID = int(os.getenv("POINT_CHANNEL_ID"))
 PLOT_CHANNEL_ID = int(os.getenv("PLOT_CHANNEL_ID"))
-ADMIN_ROLE_ID = int(os.getenv("ADMIN_ROLE_ID"))
+
 
 DATA_FILE = "points.json"
 
