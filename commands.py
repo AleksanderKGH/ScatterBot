@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import io, os
 from config import COLOR_OPTIONS, PLOT_COLORS
-from config import POINT_CHANNEL_ID, PLOT_CHANNEL_ID, ADMIN_ROLE_ID, LOG_CHANNEL_ID
+from config import POINT_CHANNEL_ID, PLOT_CHANNEL_ID, LOG_CHANNEL_ID
 from data import load_data, save_data
 from utils import log_action, require_channel
 # https://discord.com/oauth2/authorize?client_id=1385341075572396215&permissions=2147609600
