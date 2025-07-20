@@ -2,15 +2,33 @@ import discord
 from discord import app_commands, Interaction, ui
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from PIL import Image
 import io, os
-from config import COLOR_OPTIONS, PLOT_COLORS
-from config import POINT_CHANNEL_ID, PLOT_CHANNEL_ID, LOG_CHANNEL_ID
+import config
 from data import load_data, save_data
 from utils import log_action, require_channel
 # https://discord.com/oauth2/authorize?client_id=1385341075572396215&permissions=2147609600
-
+import json
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
+
+
+BACKUP_DIR = "backups"
+os.makedirs(BACKUP_DIR, exist_ok=True)
+
+def backup_points(data):
+    date_key = datetime.utcnow().strftime("%Y-%m-%d")
+    path = os.path.join(BACKUP_DIR, f"{date_key}.json")
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+
+def load_yesterdays_points():
+    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    path = os.path.join(BACKUP_DIR, f"{yesterday}.json")
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return json.load(f)
+    return {}
 
 
 VILLAGE_OPTIONS = [
@@ -18,8 +36,37 @@ VILLAGE_OPTIONS = [
     "Wheat Street",
     "An Bread Capital",
     "Sourdough Hills",
-    "Yeastopia"
+    "Yeastopia",
+    "Harvesta"
 ]
+
+class ConfirmYesterdayView(discord.ui.View):
+    def __init__(self, author_id):
+        super().__init__(timeout=30)
+        self.author_id = author_id
+        self.confirmed = False
+
+    @discord.ui.button(label="✅ Yes, I saw it fall!", style=discord.ButtonStyle.success)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("❌ You didn’t start this confirmation.", ephemeral=True)
+            return
+
+        self.confirmed = True
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(content="📍 Pearl confirmed. Adding to the map...", view=self)
+        self.stop()
+
+    @discord.ui.button(label="❌ Nope, don’t add it", style=discord.ButtonStyle.danger)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("❌ You didn’t start this confirmation.", ephemeral=True)
+            return
+
+        await interaction.response.edit_message(content="❌ Cancelled. Pearl not added.", view=None)
+        self.stop()
+
 
 class ConfirmClearView(ui.View):
     def __init__(self, author_id):
@@ -55,16 +102,17 @@ def generate_plot(village: str, include_fake: bool, user_id: int = None) -> io.B
         path = f"{village}{ext}"
         if os.path.exists(path):
             try:
-                img = mpimg.imread(path)
+                print(f"Attempting to load: {path}")
+                img = Image.open(path)
                 ax.imshow(img, extent=[160, -160, -160, 160], zorder=0)
                 break
             except Exception as e:
-                print(f"Image load failed for {village}: {e}")
+                print(f"Image load failed for {village} at {path}: {e}")
                 break
 
     # Plot actual points
     for x, y, color in data[village]:
-        plot_color = PLOT_COLORS.get(color.lower(), color.lower())
+        plot_color = config.PLOT_COLORS.get(color.lower(), color.lower())
         ax.scatter(x, y, color=plot_color, zorder=1)
 
     # Add fake point if needed
@@ -87,8 +135,9 @@ def generate_plot(village: str, include_fake: bool, user_id: int = None) -> io.B
         else:
             fake_y = -80
             fake_x = random.randint(-160, 160)
-        fake_color = random.choice(COLOR_OPTIONS).lower()
-        fake_plot_color = PLOT_COLORS.get(fake_color, fake_color)
+
+        fake_color = random.choice(config.COLOR_OPTIONS).lower()
+        fake_plot_color = config.PLOT_COLORS.get(fake_color, fake_color)
         ax.scatter(fake_x, fake_y, color=fake_plot_color, zorder=1)
 
         return_info = (fake_x, fake_y, fake_color)
@@ -99,8 +148,17 @@ def generate_plot(village: str, include_fake: bool, user_id: int = None) -> io.B
     ax.set_title(f"Village: {village}")
     ax.set_xlim(160, -160)
     ax.set_ylim(-160, 160)
-    ax.set_xticks([x for x in range(160, -161, -40)])
-    ax.set_yticks([y for y in range(-160, 161, 40)])
+
+    # Set ticks at every 20
+    ax.set_xticks([x for x in range(160, -161, -20)])
+    ax.set_yticks([y for y in range(-160, 161, 20)])
+
+    # Add grid lines
+    ax.grid(True, linestyle="--", linewidth=0.5, color="gray", zorder=0)
+
+    # Add bold origin lines
+    ax.axhline(y=0, color='black', linewidth=1)
+    ax.axvline(x=0, color='black', linewidth=1)
 
     # Save to buffer
     buf = io.BytesIO()
@@ -110,13 +168,11 @@ def generate_plot(village: str, include_fake: bool, user_id: int = None) -> io.B
     return buf, return_info
 
 
-
-
 data = load_data()
 
 def register_commands(tree: app_commands.CommandTree):
 
-    @tree.command(name="point", description="Add a point to a village")
+    @tree.command(name="point", description="Add a point to a village!")
     @app_commands.describe(
         x="X coordinate (-160 to 160)",
         y="Y coordinate (-160 to 160)",
@@ -124,7 +180,7 @@ def register_commands(tree: app_commands.CommandTree):
         village="Village name (optional)"
     )
     async def point(interaction: discord.Interaction, x: float, y: float, color: str, village: str = "Dogville"):
-        if not await require_channel(POINT_CHANNEL_ID)(interaction):
+        if not await require_channel(config.POINT_CHANNEL_ID)(interaction):
             return
         if not (-160 <= x <= 160) or not (-160 <= y <= 160):
             await interaction.response.send_message(
@@ -151,6 +207,31 @@ def register_commands(tree: app_commands.CommandTree):
                 ephemeral=True
             )
             return
+        # Check yesterday's data before adding
+        # Check yesterday's data
+        yesterdays_data = load_yesterdays_points()
+        # print(f"Loaded yesterday: {yesterdays_data}")
+        y_points = yesterdays_data.get(village, [])
+        if any(
+            round(existing[0], 2) == round(x, 2) and
+            round(existing[1], 2) == round(y, 2) and
+            existing[2].lower() == color.lower()
+            for existing in y_points
+        ):
+            view = ConfirmYesterdayView(interaction.user.id)
+            embed = discord.Embed(
+                title="👀 Pearl Spotted Yesterday",
+                description=f"There's already a pearl at ({x}, {y}, {color}) from **yesterday**.\nDid you see it fall from the sky?",
+                color=discord.Color.gold()
+            )
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            await view.wait()
+
+            if not view.confirmed:
+                return
+
+
+
 
         data[village].append([x, y, color.lower()])
         save_data(data)
@@ -162,7 +243,7 @@ def register_commands(tree: app_commands.CommandTree):
     async def color_autocomplete(interaction: discord.Interaction, current: str):
         return [
             app_commands.Choice(name=color, value=color)
-            for color in COLOR_OPTIONS if current.lower() in color.lower()
+            for color in config.COLOR_OPTIONS if current.lower() in color.lower()
         ]
     @point.autocomplete("village")
     async def village_autocomplete(interaction: discord.Interaction, current: str):
@@ -174,7 +255,7 @@ def register_commands(tree: app_commands.CommandTree):
     @tree.command(name="plot", description="Plot points from a village.")
     @app_commands.describe(village="Village name (optional)")
     async def plot(interaction: discord.Interaction, village: str = "Dogville"):
-        if not await require_channel(PLOT_CHANNEL_ID)(interaction):
+        if not await require_channel(config.PLOT_CHANNEL_ID)(interaction):
             return
         if village not in data or not data[village]:
             await interaction.response.send_message("That village has no data.", ephemeral=True)
@@ -191,7 +272,7 @@ def register_commands(tree: app_commands.CommandTree):
     @tree.command(name="plotdetailed", description="Plot a detailed map")
     @app_commands.describe(village="Village name (optional)")
     async def plotpure(interaction: discord.Interaction, village: str = "Dogville"):
-        if not await require_channel(LOG_CHANNEL_ID)(interaction):
+        if not await require_channel(config.LOG_CHANNEL_ID)(interaction):
             return
         if village not in data or not data[village]:
             await interaction.response.send_message("That village has no data.", ephemeral=True)
@@ -205,9 +286,9 @@ def register_commands(tree: app_commands.CommandTree):
 
     @tree.command(name="clearmaps", description="Clear all points from all villages")
     async def clearmaps(interaction: Interaction):
-        if interaction.channel_id != LOG_CHANNEL_ID:
+        if interaction.channel_id != config.LOG_CHANNEL_ID:
             await interaction.response.send_message(
-                f"❌ This command can only be used in <#{LOG_CHANNEL_ID}>.",
+                f"❌ This command can only be used in <#{config.LOG_CHANNEL_ID}>.",
                 ephemeral=True
             )
             return
@@ -224,6 +305,10 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.followup.send("❌ Timed out. No data was cleared.", ephemeral=True)
             return
 
+
+        backup_points(data)
+        data.clear()
+        save_data(data)
         # Clear points but keep village keys
         for village in data.keys():
             data[village] = []
@@ -234,9 +319,9 @@ def register_commands(tree: app_commands.CommandTree):
 
     @tree.command(name="villages", description="List all tracked villages and how many points are in each")
     async def list_villages(interaction: discord.Interaction):
-        if interaction.channel_id != POINT_CHANNEL_ID:
+        if interaction.channel_id != config.POINT_CHANNEL_ID:
                 await interaction.response.send_message(
-                    f"❌ This command can only be used in <#{POINT_CHANNEL_ID}>.",
+                    f"❌ This command can only be used in <#{config.POINT_CHANNEL_ID}>.",
                     ephemeral=True
                 )
                 return
@@ -279,7 +364,36 @@ def register_commands(tree: app_commands.CommandTree):
 
 
 
+    @tree.command(name="undo", description="Undo the last point added to a village")
+    @app_commands.describe(village="Village to remove the last point from")
+    @app_commands.autocomplete(village=village_autocomplete)  # Optional: use your existing autocomplete
+    async def undo(interaction: discord.Interaction, village: str = "Dogville"):
+        from data import load_data, save_data
+        data = load_data()
+        if interaction.channel_id != config.POINT_CHANNEL_ID:
+            await interaction.response.send_message(
+                f"❌ This command can only be used in <#{config.POINT_CHANNEL_ID}>.",
+                ephemeral=True
+            )
+            return
 
+
+        if village not in data or not data[village]:
+            await interaction.response.send_message(
+                f"❌ No points to remove from **{village}**.",
+                ephemeral=True
+            )
+            return
+
+        last_point = data[village].pop()
+        save_data(data)
+
+        x, y, color = last_point
+        await interaction.response.send_message(
+            f"↩️ Removed latest point: ({x}, {y}, {color}) from **{village}**.",
+            ephemeral=True
+        )
+        await log_action(interaction, f"Removed last point ({x}, {y}, {color}) from **{village}**")
 
 
 
@@ -287,36 +401,40 @@ def register_commands(tree: app_commands.CommandTree):
 
     @tree.command(name="noob", description="List all available commands")
     async def noob_command(interaction: discord.Interaction):
+        from config import POINT_CHANNEL_ID, PLOT_CHANNEL_ID  # import your channel IDs
+
         embed = discord.Embed(
-            title="🗺️ PearlMap Bot Commands",
-            description="Here are the available commands you can use!",
+            title="📖 PearlMapBot Help",
+            description="Here's a breakdown of available commands and their usage:",
             color=discord.Color.blurple()
         )
 
         embed.add_field(
-            name="🧭 /point",
-            value="Add a point to a village. Provide coordinates, color, and village name (optional, defaults to Dogville).",
+            name="🎯 /point",
+            value=f"Add a point to a village. Must be used in <#{POINT_CHANNEL_ID}>.\n"
+                "Includes coordinate validation and color selection.",
             inline=False
         )
         embed.add_field(
-            name="🖼️ /plot",
-            value="Generate a scatter plot of points in a village. Defaults to Dogville if none provided.",
+            name="🗺️ /plot",
+            value=f"Generate a plotted map image. Must be used in <#{PLOT_CHANNEL_ID}>.",
             inline=False
         )
         embed.add_field(
-            name="📜 /villages",
-            value="List all tracked villages and the number of points in each.",
+            name="📊 /villages",
+            value=f"Shows current tracked village stats (use in <#{POINT_CHANNEL_ID}>).",
+            inline=False
+        )
+        embed.add_field(
+            name="♻️ /undo",
+            value="Removes the most recently added point.",
             inline=False
         )
         embed.add_field(
             name="🧹 /clearmaps",
-            value="Clear all points in all villages (admin-only, confirmation required).",
+            value="Admin-only: Clears all village points. Requires confirmation and must be used in the log channel.",
             inline=False
         )
-        embed.add_field(
-            name="❓ /noob",
-            value="You're looking at it! Shows all available commands.",
-            inline=False
-        )
+        embed.set_footer(text="More features coming soon. Stay crusty 🥖")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)

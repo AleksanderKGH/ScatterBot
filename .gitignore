@@ -17,3 +17,8 @@ Thumbs.db
 # Python virtual environments (if applicable)
 .venv/
 env/
+
+
+*.png
+backups/
+points.json

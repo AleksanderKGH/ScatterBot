@@ -1,6 +1,10 @@
 import discord
-from config import TOKEN
+from config import TOKEN, LOG_CHANNEL_ID
 from commands import register_commands
+
+
+
+print(f"[DEBUG] Logging to channel ID: {LOG_CHANNEL_ID}")
 
 intents = discord.Intents.default()
 intents.guilds = True
