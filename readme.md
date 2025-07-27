@@ -28,10 +28,12 @@ git clone https://github.com/AleksanderKGH/ScatterBot.git
 ### 2. Set Up Environment
 
 Create a .env file with the proper tokens
+ENV=DEV/PROD
 DISCORD_TOKEN=
 LOG_CHANNEL_ID=
 POINT_CHANNEL_ID=
 PLOT_CHANNEL_ID=
+GUILD_ID=
 
 🔒 Never commit this file! .env is in .gitignore for your safety.
 

@@ -16,7 +16,7 @@ Thumbs.db
 
 # Python virtual environments (if applicable)
 .venv/
-env/
+.env*
 
 
 *.png
