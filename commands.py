@@ -115,7 +115,7 @@ def generate_plot(village: str, include_fake: bool, user_id: int = None) -> io.B
         plot_color = config.PLOT_COLORS.get(color.lower(), color.lower())
         # ax.scatter(x, y, color=plot_color, zorder=1)
         ax.scatter(x, y, color=plot_color, s=50, edgecolors='black')
-        ax.text(x, y -4, f"({int(x)}, {int(y)})", fontsize=8, color='white', ha='center', va='top')
+        ax.text(x, y -4, f"({int(x)}, {int(y)})", fontsize=10, color='black', ha='center', va='top')
  
     # Add fake point if needed
     if include_fake and user_id is not None:
@@ -141,7 +141,7 @@ def generate_plot(village: str, include_fake: bool, user_id: int = None) -> io.B
         fake_color = random.choice(config.COLOR_OPTIONS).lower()
         fake_plot_color = config.PLOT_COLORS.get(fake_color, fake_color)
         ax.scatter(fake_x, fake_y, color=fake_plot_color, zorder=1)
-        ax.text(x, y - 4, f"({int(x)}, {int(y)})", fontsize=8, color='white', ha='center', va='top')  
+        ax.text(fake_x, fake_y - 4, f"({int(fake_x)}, {int(fake_y)})", fontsize=10, color='black', ha='center', va='top')
         return_info = (fake_x, fake_y, fake_color)
     else:
         return_info = None
