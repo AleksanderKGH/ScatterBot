@@ -199,6 +199,14 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
+        # Only allow valid colors
+        if color.lower() not in [c.lower() for c in config.COLOR_OPTIONS]:
+            await interaction.response.send_message(
+                f"🚫 Invalid color '{color}'. Valid options are: {', '.join(config.COLOR_OPTIONS)}",
+                ephemeral=True
+            )
+            return
+
         if village not in data:
             data[village] = []
 
