@@ -35,7 +35,7 @@ VILLAGE_OPTIONS = [
     "Dogville",
     "Wheat Street",
     "An Bread Capital",
-    "Sourdough Hills",
+    "Honey Wheat Hallow",
     "Yeastopia",
     "Harvesta"
 ]
