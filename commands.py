@@ -265,7 +265,7 @@ def register_commands(tree: app_commands.CommandTree):
     @tree.command(name="plot", description="Plot points from a village.")
     @app_commands.describe(village="Village name (optional)")
     async def plot(interaction: discord.Interaction, village: str = "Dogville"):
-        if not await require_channel(config.PLOT_CHANNEL_ID)(interaction):
+        if not await require_channel(config.PLOT_CHANNEL_ID, config.POINT_CHANNEL_ID)(interaction):
             return
         if village not in data or not data[village]:
             await interaction.response.send_message("That village has no data.", ephemeral=True)
