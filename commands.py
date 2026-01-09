@@ -37,7 +37,8 @@ VILLAGE_OPTIONS = [
     "An Bread Capital",
     "Honey Wheat Hallow",
     "Yeastopia",
-    "Harvesta"
+    "Harvesta",
+    "Kitsune Ville"
 ]
 
 class ConfirmYesterdayView(discord.ui.View):
