@@ -34,6 +34,7 @@ LOG_CHANNEL_ID=
 POINT_CHANNEL_ID=
 PLOT_CHANNEL_ID=
 GUILD_ID=
+RESIDENT_ROLE_ID=
 
 🔒 Never commit this file! .env is in .gitignore for your safety.
 

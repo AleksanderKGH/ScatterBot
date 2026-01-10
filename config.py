@@ -14,6 +14,8 @@ LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
 POINT_CHANNEL_ID = int(os.getenv("POINT_CHANNEL_ID"))
 PLOT_CHANNEL_ID = int(os.getenv("PLOT_CHANNEL_ID"))
 GUILD_ID = int(os.getenv("GUILD_ID"))
+RESIDENT_ROLE_ID = int(os.getenv("RESIDENT_ROLE_ID"))
+PEARL_ROLE_ID = int(os.getenv("PEARL_ROLE_ID"))
 
 DATA_FILE = "points.json"
 

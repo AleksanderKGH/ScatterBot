@@ -449,3 +449,51 @@ def register_commands(tree: app_commands.CommandTree):
         embed.set_footer(text="More features coming soon. Stay crusty 🥖")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @tree.command(name="residentjson", description="Dumps all users with specific roles as JSON")
+    async def resident_json(interaction: discord.Interaction):
+        if interaction.channel_id != config.LOG_CHANNEL_ID:
+            await interaction.response.send_message(
+                f"❌ This command can only be used in <#{config.LOG_CHANNEL_ID}>.",
+                ephemeral=True
+            )
+            return
+
+        guild = interaction.guild
+        roles_to_check = [
+            config.RESIDENT_ROLE_ID,
+            config.PEARL_ROLE_ID
+        ]
+
+        residents = []
+        for member in guild.members:
+            if any(role.id in roles_to_check for role in member.roles):
+                resident_info = {
+                    "id": member.id,
+                    "name": str(member),
+                    "roles": [role.name for role in member.roles if role.id in roles_to_check]
+                }
+                residents.append(resident_info)
+
+        json_data = json.dumps(residents, indent=2)
+        buf = io.BytesIO(json_data.encode('utf-8'))
+        buf.seek(0)
+
+        await log_action(interaction, "Exported residents as JSON")
+        await interaction.response.send_message(
+            content="📋 Here is the list of residents with specified roles:",
+            file=discord.File(buf, "residents.json"),
+            ephemeral=True
+        )
+
+    @tree.command(name="sync", description="Sync commands to the guild (admin only)")
+    async def sync_commands(interaction: discord.Interaction):
+        if interaction.channel_id != config.LOG_CHANNEL_ID:
+            await interaction.response.send_message(
+                f"❌ This command can only be used in <#{config.LOG_CHANNEL_ID}>.",
+                ephemeral=True
+            )
+            return
+
+        await tree.sync(guild=discord.Object(id=config.GUILD_ID))
+        await interaction.response.send_message("✅ Commands synced to the guild.", ephemeral=True)
