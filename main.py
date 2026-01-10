@@ -11,8 +11,8 @@ tree = discord.app_commands.CommandTree(client)
 @client.event
 async def on_ready():
     register_commands(tree)
-    # await tree.sync()  # Global sync (takes up to 1 hour)
-    # print(f"✅ Synced commands globally")
+    await tree.sync()  # Global sync (takes up to 1 hour)
+    print(f"✅ Synced commands globally")
     
     # Debug: Print all registered commands  
     all_commands = tree.get_commands()  
