@@ -508,6 +508,7 @@ def register_commands(tree: app_commands.CommandTree):
                 residents.append({
                     "id": member.id,
                     "name": str(member.name),
+                    "nickname": str(member.nick) if member.nick else "",
                     "roles": "; ".join(roles_list)  # Semicolon-separated for CSV safety
                 })
 
@@ -515,7 +516,7 @@ def register_commands(tree: app_commands.CommandTree):
         import csv
         output = io.StringIO()
         if residents:
-            writer = csv.DictWriter(output, fieldnames=["id", "name", "roles"])
+            writer = csv.DictWriter(output, fieldnames=["id", "name","nickname", "roles"])
             writer.writeheader()
             writer.writerows(residents)
         
