@@ -486,6 +486,50 @@ def register_commands(tree: app_commands.CommandTree):
             ephemeral=True
         )
 
+    @tree.command(name="residentcsv", description="Exports users with specific roles as CSV (Excel/Sheets compatible)")
+    async def resident_csv(interaction: discord.Interaction):
+        if interaction.channel_id != config.LOG_CHANNEL_ID:
+            await interaction.response.send_message(
+                f"❌ This command can only be used in <#{config.LOG_CHANNEL_ID}>.",
+                ephemeral=True
+            )
+            return
+
+        guild = interaction.guild
+        roles_to_check = [
+            config.RESIDENT_ROLE_ID,
+            config.PEARL_ROLE_ID
+        ]
+
+        residents = []
+        for member in guild.members:
+            if any(role.id in roles_to_check for role in member.roles):
+                roles_list = [role.name for role in member.roles if role.id in roles_to_check]
+                residents.append({
+                    "id": member.id,
+                    "name": str(member),
+                    "roles": "; ".join(roles_list)  # Semicolon-separated for CSV safety
+                })
+
+        # Build CSV
+        import csv
+        output = io.StringIO()
+        if residents:
+            writer = csv.DictWriter(output, fieldnames=["id", "name", "roles"])
+            writer.writeheader()
+            writer.writerows(residents)
+        
+        csv_data = output.getvalue()
+        buf = io.BytesIO(csv_data.encode('utf-8'))
+        buf.seek(0)
+
+        await log_action(interaction, "Exported residents as CSV")
+        await interaction.response.send_message(
+            content="📊 Here is the CSV file — opens directly in Excel and Google Sheets:",
+            file=discord.File(buf, "residents.csv"),
+            ephemeral=True
+        )
+
     @tree.command(name="sync", description="Sync commands to the guild (admin only)")
     async def sync_commands(interaction: discord.Interaction):
         if interaction.channel_id != config.LOG_CHANNEL_ID:
