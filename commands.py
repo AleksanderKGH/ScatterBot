@@ -507,7 +507,7 @@ def register_commands(tree: app_commands.CommandTree):
                 roles_list = [role.name for role in member.roles if role.id in roles_to_check]
                 residents.append({
                     "id": member.id,
-                    "name": str(member),
+                    "name": str(member.name),
                     "roles": "; ".join(roles_list)  # Semicolon-separated for CSV safety
                 })
 
