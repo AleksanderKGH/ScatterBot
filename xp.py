@@ -1,5 +1,6 @@
 import os
 import json
+from typing import Tuple, Optional
 
 XP_FILE = "xp.json"
 
@@ -45,7 +46,7 @@ def get_leaderboard(limit: int = 10):
     sorted_users = sorted(xp_data.items(), key=lambda x: x[1], reverse=True)
     return sorted_users[:limit]
 
-def get_user_rank(user_id: int) -> tuple[int, int]:
+def get_user_rank(user_id: int) -> Tuple[Optional[int], int]:
     """
     Get user's rank and total XP.
     Returns (rank, xp) where rank is 1-indexed.

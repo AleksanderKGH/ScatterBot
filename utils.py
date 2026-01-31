@@ -1,5 +1,6 @@
 import discord
 from discord import Interaction
+from typing import Optional
 import config  # Use dynamic access
 
 async def log_action(interaction: discord.Interaction, message: str):
@@ -57,7 +58,7 @@ def get_point_data(point) -> tuple:
     return normalized["x"], normalized["y"], normalized["color"]
 
 
-def get_point_user(point) -> int | None:
+def get_point_user(point) -> Optional[int]:
     """Get the user_id from a point, or None if not present."""
     normalized = normalize_point(point)
     return normalized.get("user_id")
