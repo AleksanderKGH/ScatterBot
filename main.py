@@ -11,11 +11,14 @@ tree = discord.app_commands.CommandTree(client)
 @client.event
 async def on_ready():
     register_commands(tree)
-    await tree.sync()  # Global sync (takes up to 1 hour)
-    print(f"✅ Synced commands globally")
+    # Sync to specific guild for instant updates (instead of global 1-hour delay)
+    guild = discord.Object(id=GUILD_ID)
+    tree.copy_global_to(guild=guild)
+    await tree.sync(guild=guild)
+    print(f"✅ Synced commands to guild {GUILD_ID}")
     
     # Debug: Print all registered commands  
-    all_commands = tree.get_commands()  
+    all_commands = tree.get_commands(guild=guild)  
     print(f"📋 Registered commands: {[cmd.name for cmd in all_commands]}")
     
     print(f"✅ Logged in as {client.user}")

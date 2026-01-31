@@ -6,11 +6,13 @@ from PIL import Image
 import io, os
 import config
 from data import load_data, save_data
-from utils import log_action, require_channel
+from utils import log_action, require_channel, create_point, get_point_data, normalize_point, get_top_contributors, get_point_user
+import xp
 # https://discord.com/oauth2/authorize?client_id=1385341075572396215&permissions=2147609600
 import json
 import random
 from datetime import datetime, timedelta
+from discord import ui
 
 
 BACKUP_DIR = "backups"
@@ -95,6 +97,180 @@ class ConfirmClearView(ui.View):
         await interaction.response.edit_message(content="❌ Cancelled. No data was cleared.", view=None)
         self.stop()
 
+
+class UndoPointView(ui.View):
+    def __init__(self, author_id, village, points_with_indices, is_admin=False):
+        super().__init__(timeout=60)
+        self.author_id = author_id
+        self.village = village
+        self.points_with_indices = points_with_indices  # List of (index, point) tuples
+        self.is_admin = is_admin
+        self.page = 0
+        self.items_per_page = 5
+        self.selected_index = None
+        self.update_buttons()
+
+    def get_embed(self):
+        start = self.page * self.items_per_page
+        end = start + self.items_per_page
+        page_points = self.points_with_indices[start:end]
+        
+        embed = discord.Embed(
+            title=f"🗑️ Remove Point from {self.village}",
+            description="Select a point to remove:" if not self.is_admin else "Admin Mode: Remove any point",
+            color=discord.Color.orange()
+        )
+        
+        for i, (idx, point) in enumerate(page_points):
+            x, y, color = get_point_data(point)
+            user_id = get_point_user(point)
+            user_info = f"<@{user_id}>" if user_id else "Unknown"
+            embed.add_field(
+                name=f"{start + i + 1}. ({x}, {y}) - {color.capitalize()}",
+                value=f"Added by: {user_info}",
+                inline=False
+            )
+        
+        embed.set_footer(text=f"Page {self.page + 1}/{self.total_pages()} • Total: {len(self.points_with_indices)} points")
+        return embed
+
+    def total_pages(self):
+        return (len(self.points_with_indices) - 1) // self.items_per_page + 1
+
+    def update_buttons(self):
+        self.clear_items()
+        
+        # Number buttons for selection
+        start = self.page * self.items_per_page
+        end = min(start + self.items_per_page, len(self.points_with_indices))
+        
+        for i in range(start, end):
+            relative_num = i - start + 1
+            button = ui.Button(
+                label=str(relative_num),
+                style=discord.ButtonStyle.primary,
+                custom_id=f"select_{i}"
+            )
+            button.callback = self.make_select_callback(i)
+            self.add_item(button)
+        
+        # Navigation buttons
+        if self.page > 0:
+            prev_button = ui.Button(label="◀️ Previous", style=discord.ButtonStyle.secondary)
+            prev_button.callback = self.previous_page
+            self.add_item(prev_button)
+        
+        if self.page < self.total_pages() - 1:
+            next_button = ui.Button(label="Next ▶️", style=discord.ButtonStyle.secondary)
+            next_button.callback = self.next_page
+            self.add_item(next_button)
+        
+        # Cancel button
+        cancel_button = ui.Button(label="❌ Cancel", style=discord.ButtonStyle.danger)
+        cancel_button.callback = self.cancel
+        self.add_item(cancel_button)
+
+    def make_select_callback(self, index):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.author_id:
+                await interaction.response.send_message("❌ You didn't start this action.", ephemeral=True)
+                return
+            
+            self.selected_index = self.points_with_indices[index][0]
+            point = self.points_with_indices[index][1]
+            x, y, color = get_point_data(point)
+            
+            # Confirm deletion
+            confirm_view = ui.View(timeout=30)
+            
+            async def confirm_delete(confirm_interaction: discord.Interaction):
+                if confirm_interaction.user.id != self.author_id:
+                    await confirm_interaction.response.send_message("❌ You didn't start this action.", ephemeral=True)
+                    return
+                
+                from data import load_data, save_data
+                data = load_data()
+                if self.village in data and self.selected_index < len(data[self.village]):
+                    removed_point = data[self.village].pop(self.selected_index)
+                    save_data(data)
+                    
+                    # Deduct XP from the point owner
+                    point_owner = get_point_user(removed_point)
+                    if point_owner:
+                        new_xp = xp.subtract_xp(point_owner, 1)
+                        xp_msg = f" (-1 XP for <@{point_owner}>, now at {new_xp})"
+                    else:
+                        xp_msg = ""
+                    
+                    rx, ry, rcolor = get_point_data(removed_point)
+                    await confirm_interaction.response.edit_message(
+                        content=f"✅ Removed point: ({rx}, {ry}, {rcolor}) from **{self.village}**{xp_msg}",
+                        embed=None,
+                        view=None
+                    )
+                    from utils import log_action
+                    await log_action(confirm_interaction, f"Removed point ({rx}, {ry}, {rcolor}) from **{self.village}**{xp_msg}")
+                else:
+                    await confirm_interaction.response.edit_message(
+                        content="❌ Point no longer exists.",
+                        embed=None,
+                        view=None
+                    )
+            
+            async def cancel_delete(cancel_interaction: discord.Interaction):
+                if cancel_interaction.user.id != self.author_id:
+                    await cancel_interaction.response.send_message("❌ You didn't start this action.", ephemeral=True)
+                    return
+                await cancel_interaction.response.edit_message(
+                    content="❌ Deletion cancelled.",
+                    embed=None,
+                    view=None
+                )
+            
+            confirm_button = ui.Button(label="✅ Confirm Delete", style=discord.ButtonStyle.danger)
+            confirm_button.callback = confirm_delete
+            cancel_button = ui.Button(label="❌ Cancel", style=discord.ButtonStyle.secondary)
+            cancel_button.callback = cancel_delete
+            
+            confirm_view.add_item(confirm_button)
+            confirm_view.add_item(cancel_button)
+            
+            confirm_embed = discord.Embed(
+                title="⚠️ Confirm Deletion",
+                description=f"Are you sure you want to delete this point?\n\n**Location:** ({x}, {y})\n**Color:** {color.capitalize()}\n**Village:** {self.village}",
+                color=discord.Color.red()
+            )
+            
+            await interaction.response.edit_message(embed=confirm_embed, view=confirm_view)
+        
+        return callback
+
+    async def previous_page(self, interaction: discord.Interaction):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("❌ You didn't start this action.", ephemeral=True)
+            return
+        
+        self.page -= 1
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.get_embed(), view=self)
+
+    async def next_page(self, interaction: discord.Interaction):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("❌ You didn't start this action.", ephemeral=True)
+            return
+        
+        self.page += 1
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.get_embed(), view=self)
+
+    async def cancel(self, interaction: discord.Interaction):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("❌ You didn't start this action.", ephemeral=True)
+            return
+        
+        await interaction.response.edit_message(content="❌ Cancelled.", embed=None, view=None)
+        self.stop()
+
 def generate_plot(village: str, include_fake: bool, user_id: int = None) -> io.BytesIO:
     fig, ax = plt.subplots(figsize=(6, 6))
 
@@ -112,7 +288,8 @@ def generate_plot(village: str, include_fake: bool, user_id: int = None) -> io.B
                 break
 
     # Plot actual points
-    for x, y, color in data[village]:
+    for point in data[village]:
+        x, y, color = get_point_data(point)
         plot_color = config.PLOT_COLORS.get(color.lower(), color.lower())
         # ax.scatter(x, y, color=plot_color, zorder=1)
         ax.scatter(x, y, color=plot_color, s=50, edgecolors='black')
@@ -212,7 +389,10 @@ def register_commands(tree: app_commands.CommandTree):
             data[village] = []
 
         # Check for duplicate
-        if any(existing[0] == x and existing[1] == y and existing[2] == color.lower() for existing in data[village]):
+        if any(
+            get_point_data(existing) == (x, y, color.lower())
+            for existing in data[village]
+        ):
             await interaction.response.send_message(
                 f"🚫 That point already exists in '{village}' with the same color.",
                 ephemeral=True
@@ -224,9 +404,9 @@ def register_commands(tree: app_commands.CommandTree):
         # print(f"Loaded yesterday: {yesterdays_data}")
         y_points = yesterdays_data.get(village, [])
         if any(
-            round(existing[0], 2) == round(x, 2) and
-            round(existing[1], 2) == round(y, 2) and
-            existing[2].lower() == color.lower()
+            round(get_point_data(existing)[0], 2) == round(x, 2) and
+            round(get_point_data(existing)[1], 2) == round(y, 2) and
+            get_point_data(existing)[2].lower() == color.lower()
             for existing in y_points
         ):
             view = ConfirmYesterdayView(interaction.user.id)
@@ -244,11 +424,15 @@ def register_commands(tree: app_commands.CommandTree):
 
 
 
-        data[village].append([x, y, color.lower()])
+        new_point = create_point(x, y, color, user_id=interaction.user.id)
+        data[village].append(new_point)
         save_data(data)
 
+        # Award XP
+        new_xp = xp.add_xp(interaction.user.id, 1)
+
         await log_action(interaction, f"Added ({x}, {y}, {color}) to **{village}**")
-        await interaction.response.send_message(f"✅ Added to '{village}'", ephemeral=True)
+        await interaction.response.send_message(f"✅ Added to '{village}' (+1 XP, Total: {new_xp})", ephemeral=True)
 
     @point.autocomplete("color")
     async def color_autocomplete(interaction: discord.Interaction, current: str):
@@ -273,11 +457,39 @@ def register_commands(tree: app_commands.CommandTree):
             return
 
         buf, fake_point = generate_plot(village, include_fake=True, user_id=interaction.user.id)
+        
+        # Get top contributors
+        top_contributors = get_top_contributors(data[village], limit=3)
+        
+        # Build embed with credits
+        embed = discord.Embed(
+            title=f"🗺️ {village} Pearl Map",
+            color=discord.Color.blue()
+        )
+        
+        if top_contributors:
+            credits = []
+            medals = ["🥇", "🥈", "🥉"]
+            for i, (user_id, count) in enumerate(top_contributors):
+                medal = medals[i] if i < len(medals) else "🏅"
+                credits.append(f"{medal} <@{user_id}>: **{count}** point{'s' if count != 1 else ''}")
+            
+            embed.add_field(
+                name="Top Contributors",
+                value="\n".join(credits),
+                inline=False
+            )
+        
+        embed.set_footer(text=f"Total points: {len(data[village])}")
+        embed.set_image(url="attachment://map.png")
+        
         await log_action(
             interaction,
             f"Plotted village **{village}** — fake pearl at `({fake_point[0]}, {fake_point[1]})` in `{fake_point[2]}`"
         )
-        await interaction.response.send_message(file=discord.File(buf, "scatter.png"), ephemeral=True)
+        
+        file = discord.File(buf, "map.png")
+        await interaction.response.send_message(embed=embed, file=file, ephemeral=True)
     
 
     @tree.command(name="plotdetailed", description="Plot a detailed map")
@@ -356,7 +568,8 @@ def register_commands(tree: app_commands.CommandTree):
 
             # Count color distribution
             color_counts = {}
-            for _, _, color in points:
+            for point in points:
+                _, _, color = get_point_data(point)
                 color = color.lower()
                 color_counts[color] = color_counts.get(color, 0) + 1
 
@@ -375,20 +588,24 @@ def register_commands(tree: app_commands.CommandTree):
 
 
 
-    @tree.command(name="undo", description="Undo the last point added to a village")
-    @app_commands.describe(village="Village to remove the last point from")
-    @app_commands.autocomplete(village=village_autocomplete)  # Optional: use your existing autocomplete
+    @tree.command(name="undo", description="Remove a point you added to a village")
+    @app_commands.describe(village="Village to remove points from")
+    @app_commands.autocomplete(village=village_autocomplete)
     async def undo(interaction: discord.Interaction, village: str = "Dogville"):
-        from data import load_data, save_data
-        data = load_data()
-        if interaction.channel_id != config.POINT_CHANNEL_ID:
+        from data import load_data
+        from utils import get_point_user
+        
+        # Check channel permissions
+        is_admin_channel = interaction.channel_id == config.LOG_CHANNEL_ID
+        if not is_admin_channel and interaction.channel_id != config.POINT_CHANNEL_ID:
             await interaction.response.send_message(
-                f"❌ This command can only be used in <#{config.POINT_CHANNEL_ID}>.",
+                f"❌ This command can only be used in <#{config.POINT_CHANNEL_ID}> or <#{config.LOG_CHANNEL_ID}>.",
                 ephemeral=True
             )
             return
 
-
+        data = load_data()
+        
         if village not in data or not data[village]:
             await interaction.response.send_message(
                 f"❌ No points to remove from **{village}**.",
@@ -396,15 +613,45 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
-        last_point = data[village].pop()
-        save_data(data)
+        # Filter points based on channel
+        if is_admin_channel:
+            # Admin mode: show all points
+            points_with_indices = [(i, point) for i, point in enumerate(data[village])]
+        else:
+            # Normal mode: only show user's points
+            points_with_indices = [
+                (i, point) for i, point in enumerate(data[village])
+                if get_point_user(point) == interaction.user.id
+            ]
+        
+        if not points_with_indices:
+            if is_admin_channel:
+                await interaction.response.send_message(
+                    f"❌ No points to remove from **{village}**.",
+                    ephemeral=True
+                )
+            else:
+                await interaction.response.send_message(
+                    f"❌ You haven't added any points to **{village}** yet.",
+                    ephemeral=True
+                )
+            return
 
-        x, y, color = last_point
+        # Reverse to show newest first
+        points_with_indices.reverse()
+        
+        view = UndoPointView(
+            author_id=interaction.user.id,
+            village=village,
+            points_with_indices=points_with_indices,
+            is_admin=is_admin_channel
+        )
+        
         await interaction.response.send_message(
-            f"↩️ Removed latest point: ({x}, {y}, {color}) from **{village}**.",
+            embed=view.get_embed(),
+            view=view,
             ephemeral=True
         )
-        await log_action(interaction, f"Removed last point ({x}, {y}, {color}) from **{village}**")
 
 
 
@@ -543,3 +790,108 @@ def register_commands(tree: app_commands.CommandTree):
 
         await tree.sync(guild=discord.Object(id=config.GUILD_ID))
         await interaction.response.send_message("✅ Commands synced to the guild.", ephemeral=True)
+    @tree.command(name="newmenutest", description="testing")
+    async def newmenutest(interaction: discord.Interaction):
+        class SampleModal(ui.Modal, title="Sample Form"):
+            # Define text input fields
+            name_input = ui.TextInput(
+                label="Village Name",
+                placeholder="Enter the village name...",
+                required=True,
+                max_length=50
+            )
+            
+            pearl_input = ui.TextInput(
+                label="Pearl Color",
+                placeholder="Enter the pearl color...",
+                required=True,
+                max_length=10
+            )
+            
+            x_input = ui.TextInput(
+                label="X Coordinate",
+                placeholder="Enter X coordinate...",
+                required=True,
+                max_length=4
+            )
+
+            y_input = ui.TextInput(
+                label="Y Coordinate",
+                placeholder="Enter Y coordinate...",
+                required=True,
+                max_length=4
+            )
+
+
+            async def on_submit(self, interaction: discord.Interaction):
+                # This runs when user clicks "Submit" on the modal
+                name = self.name_input.value
+                pearl_color = self.pearl_input.value
+                x_coordinate = self.x_input.value
+                y_coordinate = self.y_input.value
+                await interaction.response.send_message(
+                    f"✅ Form submitted!\n"
+                    f"**Village Name:** {name}\n"
+                    f"**Pearl Color:** {pearl_color}\n"
+                    f"**X Coordinate:** {x_coordinate}\n"
+                    f"**Y Coordinate:** {y_coordinate}",
+                    ephemeral=True
+                )
+
+        # Send the modal to the user
+        await interaction.response.send_modal(SampleModal())
+
+    @tree.command(name="xp", description="Check your XP or someone else's XP")
+    @app_commands.describe(user="User to check XP for (optional)")
+    async def check_xp(interaction: discord.Interaction, user: discord.User = None):
+        target_user = user or interaction.user
+        
+        rank, user_xp = xp.get_user_rank(target_user.id)
+        
+        embed = discord.Embed(
+            title=f"🌟 XP Stats for {target_user.display_name}",
+            color=discord.Color.gold()
+        )
+        
+        if rank:
+            embed.add_field(name="Total XP", value=f"`{user_xp}`", inline=True)
+            embed.add_field(name="Server Rank", value=f"`#{rank}`", inline=True)
+        else:
+            embed.add_field(name="Total XP", value="`0`", inline=True)
+            embed.add_field(name="Server Rank", value="`Unranked`", inline=True)
+        
+        embed.set_thumbnail(url=target_user.display_avatar.url)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @tree.command(name="leaderboard", description="View the XP leaderboard")
+    @app_commands.describe(limit="Number of top users to show (default: 10)")
+    async def leaderboard(interaction: discord.Interaction, limit: int = 10):
+        if limit < 1 or limit > 25:
+            await interaction.response.send_message("❌ Limit must be between 1 and 25.", ephemeral=True)
+            return
+        
+        top_users = xp.get_leaderboard(limit)
+        
+        if not top_users:
+            await interaction.response.send_message("📊 No one has earned XP yet!", ephemeral=True)
+            return
+        
+        embed = discord.Embed(
+            title="🏆 XP Leaderboard",
+            description=f"Top {len(top_users)} pearl mappers",
+            color=discord.Color.gold()
+        )
+        
+        leaderboard_text = []
+        for rank, (user_id, user_xp) in enumerate(top_users, start=1):
+            medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"`{rank}.`"
+            leaderboard_text.append(f"{medal} <@{user_id}> — **{user_xp} XP**")
+        
+        embed.description = "\n".join(leaderboard_text)
+        
+        # Show where the requesting user ranks if not in top list
+        requester_rank, requester_xp = xp.get_user_rank(interaction.user.id)
+        if requester_rank and requester_rank > limit:
+            embed.set_footer(text=f"Your rank: #{requester_rank} with {requester_xp} XP")
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
