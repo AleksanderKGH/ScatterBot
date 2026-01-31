@@ -669,8 +669,7 @@ def register_commands(tree: app_commands.CommandTree):
 
         embed.add_field(
             name="🎯 /point",
-            value=f"Add a point to a village. Must be used in <#{POINT_CHANNEL_ID}>.\n"
-                "Includes coordinate validation and color selection.",
+            value=f"Add a point to a village. Earns 1 XP per point added.\nMust be used in <#{POINT_CHANNEL_ID}>.",
             inline=False
         )
         embed.add_field(
@@ -685,12 +684,22 @@ def register_commands(tree: app_commands.CommandTree):
         )
         embed.add_field(
             name="♻️ /undo",
-            value="Removes the most recently added point.",
+            value="Remove points from a village. Admins can remove any point, regular users can only remove their own.",
+            inline=False
+        )
+        embed.add_field(
+            name="🌟 /xp",
+            value="Check your XP total and server rank. Optionally check another user's XP.",
+            inline=False
+        )
+        embed.add_field(
+            name="🏆 /leaderboard",
+            value="View the top XP earners on the server (default: top 10).",
             inline=False
         )
         embed.add_field(
             name="🧹 /clearmaps",
-            value="Admin-only: Clears all village points. Requires confirmation and must be used in the log channel.",
+            value="Admin-only: Clears all village points. XP is preserved. Requires confirmation.",
             inline=False
         )
         embed.set_footer(text="More features coming soon. Stay crusty 🥖")
