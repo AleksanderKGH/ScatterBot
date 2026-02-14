@@ -274,15 +274,18 @@ def register_commands(tree: app_commands.CommandTree):
         old_color_count = xp.get_user_stat(interaction.user.id, color_key)
         new_color_count = xp.add_stat(interaction.user.id, color_key, 1)
 
-        # Check for milestones
-        xp_milestone = check_milestone(old_xp, new_xp)
-        color_milestone = check_milestone(old_color_count, new_color_count)
+        # Check for milestones (only if not incognito)
+        is_incognito = xp.get_user_stat(interaction.user.id, "incognito") == 1
         
-        if xp_milestone:
-            await send_milestone_message(interaction.client, interaction.user.id, "Total XP", xp_milestone)
-        
-        if color_milestone:
-            await send_milestone_message(interaction.client, interaction.user.id, f"{color.capitalize()} Pearls", color_milestone, "pearls mapped")
+        if not is_incognito:
+            xp_milestone = check_milestone(old_xp, new_xp)
+            color_milestone = check_milestone(old_color_count, new_color_count)
+            
+            if xp_milestone:
+                await send_milestone_message(interaction.client, interaction.user.id, "Total XP", xp_milestone)
+            
+            if color_milestone:
+                await send_milestone_message(interaction.client, interaction.user.id, f"{color.capitalize()} Pearls", color_milestone, "pearls mapped")
 
         await log_action(interaction, f"Added ({x}, {y}, {color}) to **{village}**")
         await interaction.response.send_message(f"✅ Added to '{village}' (+1 XP, Total: {new_xp})", ephemeral=True)
