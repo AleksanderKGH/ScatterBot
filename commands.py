@@ -662,7 +662,6 @@ def register_commands(tree: app_commands.CommandTree):
         target_user = user or interaction.user
         
         rank, user_xp = xp.get_user_rank(target_user.id)
-        points_added = xp.get_user_stat(target_user.id, "points_added")
         goat_points = xp.get_user_stat(target_user.id, "goat_points")
         color_lines = []
         for color_name in config.COLOR_OPTIONS:
@@ -682,7 +681,6 @@ def register_commands(tree: app_commands.CommandTree):
             embed.add_field(name="Total XP", value="`0`", inline=True)
             embed.add_field(name="Server Rank", value="`Unranked`", inline=True)
 
-        embed.add_field(name="Points Added", value=f"`{points_added}`", inline=True)
         embed.add_field(name="🐐 GOAT Points", value=f"`{goat_points}`", inline=True)
         embed.add_field(name="Color Stats", value="\n".join(color_lines), inline=False)
         
