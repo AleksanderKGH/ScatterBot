@@ -173,7 +173,10 @@ def clear_all_points():
         for user_id, count in user_counts.items():
             if count >= 45:
                 xp.add_stat(user_id, "goat_points", 1)
-                goats.append((user_id, count, village))
+                # Only add to public celebration list if not incognito
+                is_incognito = xp.get_user_stat(user_id, "incognito") == 1
+                if not is_incognito:
+                    goats.append((user_id, count, village))
 
     daily_stats = {
         'total_points': total_points,
