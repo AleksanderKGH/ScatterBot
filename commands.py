@@ -115,6 +115,79 @@ def generate_plot(village: str, include_fake: bool, user_id: int = None) -> io.B
 
 data = load_data()
 
+
+def check_milestone(old_value: int, new_value: int) -> int:
+    """Check if a milestone was hit. Returns the milestone value or 0."""
+    milestones = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1500, 2000, 2500, 3000, 4000, 5000]
+    for milestone in milestones:
+        if old_value < milestone <= new_value:
+            return milestone
+    return 0
+
+
+async def send_milestone_message(client, user_id: int, milestone_type: str, value: int, detail: str = ""):
+    """Send a milestone celebration message to the point channel."""
+    channel = client.get_channel(config.POINT_CHANNEL_ID)
+    if channel is None:
+        try:
+            channel = await client.fetch_channel(config.POINT_CHANNEL_ID)
+        except Exception:
+            return
+    
+    embed = discord.Embed(
+        title="🎉 Milestone Achieved!",
+        description=f"<@{user_id}> has reached a new milestone!",
+        color=discord.Color.gold()
+    )
+    
+    if detail:
+        embed.add_field(name=milestone_type, value=f"**{value}** {detail}", inline=False)
+    else:
+        embed.add_field(name=milestone_type, value=f"**{value}**", inline=False)
+    
+    await channel.send(embed=embed)
+
+
+def clear_all_points():
+    global data
+    current_data = load_data()
+    backup_points(current_data)
+
+    goats = []
+    total_points = 0
+    contributors = set()
+    villages_mapped = 0
+    
+    for village, points in current_data.items():
+        if points:
+            villages_mapped += 1
+            total_points += len(points)
+        
+        user_counts = {}
+        for point in points:
+            user_id = get_point_user(point)
+            if user_id:
+                user_counts[user_id] = user_counts.get(user_id, 0) + 1
+                contributors.add(user_id)
+        
+        for user_id, count in user_counts.items():
+            if count >= 45:
+                xp.add_stat(user_id, "goat_points", 1)
+                goats.append((user_id, count, village))
+
+    daily_stats = {
+        'total_points': total_points,
+        'contributors': len(contributors),
+        'villages': villages_mapped
+    }
+
+    for village in list(current_data.keys()):
+        current_data[village] = []
+
+    save_data(current_data)
+    data = current_data
+    return current_data, goats, daily_stats
+
 def register_commands(tree: app_commands.CommandTree):
 
     @tree.command(name="point", description="Add a point to a village!")
@@ -193,8 +266,23 @@ def register_commands(tree: app_commands.CommandTree):
         data[village].append(new_point)
         save_data(data)
 
-        # Award XP
+        # Award XP and stats with milestone checking
+        old_xp = xp.get_user_xp(interaction.user.id)
         new_xp = xp.add_xp(interaction.user.id, 1)
+        
+        color_key = f"color_{color.lower()}"
+        old_color_count = xp.get_user_stat(interaction.user.id, color_key)
+        new_color_count = xp.add_stat(interaction.user.id, color_key, 1)
+
+        # Check for milestones
+        xp_milestone = check_milestone(old_xp, new_xp)
+        color_milestone = check_milestone(old_color_count, new_color_count)
+        
+        if xp_milestone:
+            await send_milestone_message(interaction.client, interaction.user.id, "Total XP", xp_milestone)
+        
+        if color_milestone:
+            await send_milestone_message(interaction.client, interaction.user.id, f"{color.capitalize()} Pearls", color_milestone, "pearls mapped")
 
         await log_action(interaction, f"Added ({x}, {y}, {color}) to **{village}**")
         await interaction.response.send_message(f"✅ Added to '{village}' (+1 XP, Total: {new_xp})", ephemeral=True)
@@ -294,15 +382,12 @@ def register_commands(tree: app_commands.CommandTree):
             return
 
 
-        backup_points(data)
-        data.clear()
-        save_data(data)
-        # Clear points but keep village keys
-        for village in data.keys():
-            data[village] = []
-
-        save_data(data)
-        await interaction.followup.send("🧹 All points have been cleared from all villages (villages preserved).")
+        _, goats, daily_stats = clear_all_points()
+        goat_msg = ""
+        if goats:
+            goat_lines = [f"🐐 <@{user_id}> mapped **{count}** points in **{village}**!" for user_id, count, village in goats]
+            goat_msg = "\n" + "\n".join(goat_lines)
+        await interaction.followup.send(f"🧹 All points have been cleared from all villages (villages preserved).{goat_msg}")
     
 
     @tree.command(name="villages", description="List all tracked villages and how many points are in each")
@@ -564,11 +649,6 @@ def register_commands(tree: app_commands.CommandTree):
 
         await tree.sync(guild=discord.Object(id=config.GUILD_ID))
         await interaction.response.send_message("✅ Commands synced to the guild.", ephemeral=True)
-    @tree.command(name="newmenutest", description="testing")
-    async def newmenutest(interaction: discord.Interaction):
-        
-        # Send the modal to the user
-        await interaction.response.send_modal(SampleModal())
 
     @tree.command(name="xp", description="Check your XP or someone else's XP")
     @app_commands.describe(user="User to check XP for (optional)")
@@ -576,6 +656,13 @@ def register_commands(tree: app_commands.CommandTree):
         target_user = user or interaction.user
         
         rank, user_xp = xp.get_user_rank(target_user.id)
+        points_added = xp.get_user_stat(target_user.id, "points_added")
+        goat_points = xp.get_user_stat(target_user.id, "goat_points")
+        color_lines = []
+        for color_name in config.COLOR_OPTIONS:
+            color_key = color_name.lower()
+            color_count = xp.get_user_stat(target_user.id, f"color_{color_key}")
+            color_lines.append(f"{color_name}: `{color_count}`")
         
         embed = discord.Embed(
             title=f"🌟 XP Stats for {target_user.display_name}",
@@ -588,6 +675,10 @@ def register_commands(tree: app_commands.CommandTree):
         else:
             embed.add_field(name="Total XP", value="`0`", inline=True)
             embed.add_field(name="Server Rank", value="`Unranked`", inline=True)
+
+        embed.add_field(name="Points Added", value=f"`{points_added}`", inline=True)
+        embed.add_field(name="🐐 GOAT Points", value=f"`{goat_points}`", inline=True)
+        embed.add_field(name="Color Stats", value="\n".join(color_lines), inline=False)
         
         embed.set_thumbnail(url=target_user.display_avatar.url)
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -598,8 +689,13 @@ def register_commands(tree: app_commands.CommandTree):
         if limit < 1 or limit > 25:
             await interaction.response.send_message("❌ Limit must be between 1 and 25.", ephemeral=True)
             return
-        
-        top_users = xp.get_leaderboard(limit)
+
+        top_users = xp.get_leaderboard(limit * 3)
+        top_users = [
+            (user_id, user_xp)
+            for user_id, user_xp in top_users
+            if xp.get_user_stat(user_id, "incognito") != 1
+        ][:limit]
         
         if not top_users:
             await interaction.response.send_message("📊 No one has earned XP yet!", ephemeral=True)
@@ -624,3 +720,72 @@ def register_commands(tree: app_commands.CommandTree):
             embed.set_footer(text=f"Your rank: #{requester_rank} with {requester_xp} XP")
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @tree.command(name="backfillcolorstats", description="Admin: backfill color stats from existing points")
+    async def backfill_color_stats(interaction: discord.Interaction):
+        if interaction.channel_id != config.LOG_CHANNEL_ID:
+            await interaction.response.send_message(
+                f"❌ This command can only be used in <#{config.LOG_CHANNEL_ID}>.",
+                ephemeral=True
+            )
+            return
+
+        from data import load_data
+
+        current_data = load_data()
+        if not current_data or all(len(points) == 0 for points in current_data.values()):
+            try:
+                backup_files = [
+                    f for f in os.listdir(BACKUP_DIR)
+                    if f.endswith(".json")
+                ]
+                if backup_files:
+                    latest_backup = sorted(backup_files)[-1]
+                    backup_path = os.path.join(BACKUP_DIR, latest_backup)
+                    with open(backup_path, "r") as f:
+                        current_data = json.load(f)
+            except Exception:
+                pass
+        colors = [c.lower() for c in config.COLOR_OPTIONS]
+        counts_by_user = {}
+        counted_points = 0
+        skipped_points = 0
+
+        for village_points in current_data.values():
+            for point in village_points:
+                user_id = get_point_user(point)
+                if user_id is None:
+                    skipped_points += 1
+                    continue
+                _, _, color = get_point_data(point)
+                color_key = color.lower()
+                if color_key not in colors:
+                    continue
+                counted_points += 1
+                user_stats = counts_by_user.setdefault(user_id, {})
+                stat_key = f"color_{color_key}"
+                user_stats[stat_key] = user_stats.get(stat_key, 0) + 1
+
+        xp_data = xp.load_xp()
+        for user_id in xp_data.keys():
+            user_stats = counts_by_user.setdefault(user_id, {})
+            for color_key in colors:
+                user_stats.setdefault(f"color_{color_key}", 0)
+
+        xp.set_stats_bulk(counts_by_user)
+
+        await interaction.response.send_message(
+            f"✅ Backfill complete. Counted {counted_points} points across {len(counts_by_user)} users. "
+            f"Skipped {skipped_points} points without user IDs.",
+            ephemeral=True
+        )
+
+    @tree.command(name="incognito", description="Opt in or out of the XP leaderboard")
+    @app_commands.describe(enabled="Enable incognito mode (hide from leaderboard)")
+    async def incognito(interaction: discord.Interaction, enabled: bool):
+        xp.set_stat(interaction.user.id, "incognito", 1 if enabled else 0)
+        if enabled:
+            message = "🕶️ Incognito enabled. You will be hidden from the leaderboard."
+        else:
+            message = "👀 Incognito disabled. You will appear on the leaderboard."
+        await interaction.response.send_message(message, ephemeral=True)

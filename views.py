@@ -175,6 +175,9 @@ class UndoPointView(ui.View):
                     point_owner = get_point_user(removed_point)
                     if point_owner:
                         new_xp = xp.subtract_xp(point_owner, 1)
+                        _, _, removed_color = get_point_data(removed_point)
+                        xp.add_stat(point_owner, "points_added", -1)
+                        xp.add_stat(point_owner, f"color_{removed_color.lower()}", -1)
                         xp_msg = f" (-1 XP for <@{point_owner}>, now at {new_xp})"
                     else:
                         xp_msg = ""

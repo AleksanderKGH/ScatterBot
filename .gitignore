@@ -15,6 +15,7 @@ Thumbs.db
 
 # Bot data files (user-specific)
 xp.json
+reset_state.json
 
 # Python virtual environments (if applicable)
 .venv/
