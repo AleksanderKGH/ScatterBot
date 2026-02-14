@@ -721,7 +721,7 @@ def register_commands(tree: app_commands.CommandTree):
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @tree.command(name="backfillcolorstats", description="Admin: backfill color stats from existing points")
+    @tree.command(name="backfillcolorstats", description="Admin: backfill color stats from ALL backups only")
     async def backfill_color_stats(interaction: discord.Interaction):
         if interaction.channel_id != config.LOG_CHANNEL_ID:
             await interaction.response.send_message(
@@ -730,55 +730,66 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
-        from data import load_data
+        await interaction.response.defer(ephemeral=True)
 
-        current_data = load_data()
-        if not current_data or all(len(points) == 0 for points in current_data.values()):
-            try:
-                backup_files = [
-                    f for f in os.listdir(BACKUP_DIR)
-                    if f.endswith(".json")
-                ]
-                if backup_files:
-                    latest_backup = sorted(backup_files)[-1]
-                    backup_path = os.path.join(BACKUP_DIR, latest_backup)
-                    with open(backup_path, "r") as f:
-                        current_data = json.load(f)
-            except Exception:
-                pass
         colors = [c.lower() for c in config.COLOR_OPTIONS]
         counts_by_user = {}
         counted_points = 0
         skipped_points = 0
+        processed_backups = 0
 
-        for village_points in current_data.values():
-            for point in village_points:
-                user_id = get_point_user(point)
-                if user_id is None:
-                    skipped_points += 1
+        try:
+            backup_files = [
+                f for f in os.listdir(BACKUP_DIR)
+                if f.endswith(".json")
+            ]
+            backup_files = sorted(backup_files)
+
+            for backup_file in backup_files:
+                backup_path = os.path.join(BACKUP_DIR, backup_file)
+                try:
+                    with open(backup_path, "r") as f:
+                        backup_data = json.load(f)
+                    
+                    processed_backups += 1
+                    
+                    for village_points in backup_data.values():
+                        for point in village_points:
+                            user_id = get_point_user(point)
+                            if user_id is None:
+                                skipped_points += 1
+                                continue
+                            _, _, color = get_point_data(point)
+                            color_key = color.lower()
+                            if color_key not in colors:
+                                continue
+                            counted_points += 1
+                            user_stats = counts_by_user.setdefault(user_id, {})
+                            stat_key = f"color_{color_key}"
+                            user_stats[stat_key] = user_stats.get(stat_key, 0) + 1
+                except Exception as e:
+                    print(f"Error processing {backup_file}: {e}")
                     continue
-                _, _, color = get_point_data(point)
-                color_key = color.lower()
-                if color_key not in colors:
-                    continue
-                counted_points += 1
+
+            xp_data = xp.load_xp()
+            for user_id in xp_data.keys():
                 user_stats = counts_by_user.setdefault(user_id, {})
-                stat_key = f"color_{color_key}"
-                user_stats[stat_key] = user_stats.get(stat_key, 0) + 1
+                for color_key in colors:
+                    user_stats.setdefault(f"color_{color_key}", 0)
 
-        xp_data = xp.load_xp()
-        for user_id in xp_data.keys():
-            user_stats = counts_by_user.setdefault(user_id, {})
-            for color_key in colors:
-                user_stats.setdefault(f"color_{color_key}", 0)
+            xp.set_stats_bulk(counts_by_user)
 
-        xp.set_stats_bulk(counts_by_user)
-
-        await interaction.response.send_message(
-            f"✅ Backfill complete. Counted {counted_points} points across {len(counts_by_user)} users. "
-            f"Skipped {skipped_points} points without user IDs.",
-            ephemeral=True
-        )
+            await interaction.followup.send(
+                f"✅ Backfill complete from **{processed_backups}** backup files.\n"
+                f"Counted **{counted_points}** points across **{len(counts_by_user)}** users.\n"
+                f"Skipped **{skipped_points}** points without user IDs.",
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error during backfill: {str(e)}",
+                ephemeral=True
+            )
 
     @tree.command(name="incognito", description="Opt in or out of the XP leaderboard")
     @app_commands.describe(enabled="Enable incognito mode (hide from leaderboard)")
