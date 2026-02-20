@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord import app_commands, Interaction, ui
 import matplotlib.pyplot as plt
