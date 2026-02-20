@@ -19,7 +19,12 @@ reset_state.json
 
 # Python virtual environments (if applicable)
 .venv/
+venv-1/
 .env*
+
+# Local town data
+towns/*.json
+towns/**/*.json
 
 
 *.png

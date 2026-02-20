@@ -86,11 +86,12 @@ async def send_reset_messages(goats, daily_stats):
 async def on_ready():
     global last_reset_date
     register_commands(tree)
-    # Sync to specific guild for instant updates (instead of global 1-hour delay)
     guild = discord.Object(id=GUILD_ID)
     tree.copy_global_to(guild=guild)
+    tree.clear_commands(guild=None)
+    await tree.sync()
     await tree.sync(guild=guild)
-    print(f"✅ Synced commands to guild {GUILD_ID}")
+    print(f"✅ Synced commands to guild {GUILD_ID} and cleared global commands")
     
     # Debug: Print all registered commands  
     all_commands = tree.get_commands(guild=guild)  

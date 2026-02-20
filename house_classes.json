@@ -1,0 +1,194 @@
+{
+	"version": 1,
+	"description": "House class definitions for town layout JSON. Fill in tiles and dimensions as you map floor plans.",
+	"grid": {
+		"width": 320,
+		"height": 320,
+		"origin": "center",
+		"reserved_center_size": 38
+	},
+	"defaults": {
+		"rotation_values": [0, 90, 180, 270],
+		"occupants_optional": true
+	},
+	"class_palette": {
+		"A": "house_a",
+		"L": "house_l",
+		"M": "house_m",
+		"U": "house_u"
+	},
+	"classes": {
+		"A1": {
+			"family": "A",
+			"variant": 1,
+			"label": "A1",
+			"footprint": { "width": 18, "height": 18, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"A2": {
+			"family": "A",
+			"variant": 2,
+			"label": "A2",
+			"footprint": {
+				"width": 18,
+				"height": 38,
+				"tiles": [],
+				"tile_rects": [
+					{ "x": 2, "y": 5, "width": 14, "height": 28, "role": "house" },
+					{ "x": 8, "y": 0, "width": 2, "height": 5, "role": "connector" },
+					{ "x": 8, "y": 33, "width": 2, "height": 5, "role": "connector" }
+				]
+			},
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "Centered 14x28 main body plus centered 2x5 top/bottom connectors"
+		},
+
+		"L1": {
+			"family": "L",
+			"variant": 1,
+			"label": "L1",
+			"footprint": { "width": 7, "height": 8, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"L2": {
+			"family": "L",
+			"variant": 2,
+			"label": "L2",
+			"footprint": { "width": 9, "height": 8, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"L3": {
+			"family": "L",
+			"variant": 3,
+			"label": "L3",
+			"footprint": { "width": 6, "height": 10, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"L4": {
+			"family": "L",
+			"variant": 4,
+			"label": "L4",
+			"footprint": { "width": 11, "height": 13, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"L5": {
+			"family": "L",
+			"variant": 5,
+			"label": "L5",
+			"footprint": { "width": 10, "height": 11, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"L6": {
+			"family": "L",
+			"variant": 6,
+			"label": "L6",
+			"footprint": { "width": 13, "height": 13, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+
+		"M1": {
+			"family": "M",
+			"variant": 1,
+			"label": "M1",
+			"footprint": { "width": 15, "height": 12, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"M2": {
+			"family": "M",
+			"variant": 2,
+			"label": "M2",
+			"footprint": { "width": 10, "height": 17, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"M3": {
+			"family": "M",
+			"variant": 3,
+			"label": "M3",
+			"footprint": { "width": 10, "height": 15, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"M4": {
+			"family": "M",
+			"variant": 4,
+			"label": "M4",
+			"footprint": { "width": 15, "height": 20, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"M5": {
+			"family": "M",
+			"variant": 5,
+			"label": "M5",
+			"footprint": { "width": 16, "height": 18, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"M6": {
+			"family": "M",
+			"variant": 6,
+			"label": "M6",
+			"footprint": { "width": 12, "height": 20, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+
+		"U1": {
+			"family": "U",
+			"variant": 1,
+			"label": "U1",
+			"footprint": { "width": 24, "height": 20, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"U2": {
+			"family": "U",
+			"variant": 2,
+			"label": "U2",
+			"footprint": { "width": 18,"height": 28, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"U3": {
+			"family": "U",
+			"variant": 3,
+			"label": "U3",
+			"footprint": { "width": 20, "height": 16, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"U4": {
+			"family": "U",
+			"variant": 4,
+			"label": "U4",
+			"footprint": { "width": 14, "height": 23, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"U5": {
+			"family": "U",
+			"variant": 5,
+			"label": "U5",
+			"footprint": { "width": 16, "height": 18, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		},
+		"U6": {
+			"family": "U",
+			"variant": 6,
+			"label": "U6",
+			"footprint": { "width": 20, "height": 20, "tiles": [] },
+			"allowed_rotations": [0, 90, 180, 270],
+			"notes": "TODO: add floor plan"
+		}
+	}
+}

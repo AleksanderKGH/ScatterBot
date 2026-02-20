@@ -9,13 +9,30 @@ from dotenv import load_dotenv
 load_dotenv()
 
 ENV = os.getenv("ENV", "DEV")
-TOKEN = os.getenv("DISCORD_TOKEN")
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
-POINT_CHANNEL_ID = int(os.getenv("POINT_CHANNEL_ID"))
-PLOT_CHANNEL_ID = int(os.getenv("PLOT_CHANNEL_ID"))
-GUILD_ID = int(os.getenv("GUILD_ID"))
-RESIDENT_ROLE_ID = int(os.getenv("RESIDENT_ROLE_ID"))
-PEARL_ROLE_ID = int(os.getenv("PEARL_ROLE_ID"))
+
+
+def _require_str(name: str) -> str:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        raise ValueError(f"Missing required environment variable: {name}")
+    return value.strip()
+
+
+def _require_int(name: str) -> int:
+    raw = _require_str(name)
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(f"Environment variable {name} must be an integer, got: {raw!r}") from exc
+
+
+TOKEN = _require_str("DISCORD_TOKEN")
+LOG_CHANNEL_ID = _require_int("LOG_CHANNEL_ID")
+POINT_CHANNEL_ID = _require_int("POINT_CHANNEL_ID")
+PLOT_CHANNEL_ID = _require_int("PLOT_CHANNEL_ID")
+GUILD_ID = _require_int("GUILD_ID")
+RESIDENT_ROLE_ID = _require_int("RESIDENT_ROLE_ID")
+PEARL_ROLE_ID = _require_int("PEARL_ROLE_ID")
 
 DATA_FILE = "points.json"
 
@@ -33,7 +50,7 @@ DEFAULT_VILLAGES = [
 # Load villages from environment or use defaults
 villages_env = os.getenv("VILLAGES")
 if villages_env:
-    VILLAGE_OPTIONS = [v.strip() for v in villages_env.split(",")]
+    VILLAGE_OPTIONS = [v.strip() for v in villages_env.split(",") if v.strip()]
 else:
     VILLAGE_OPTIONS = DEFAULT_VILLAGES
 
