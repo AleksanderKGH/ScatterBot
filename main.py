@@ -44,7 +44,8 @@ async def send_reset_messages(goats, daily_stats):
         if channel is None:
             try:
                 channel = await client.fetch_channel(channel_id)
-            except Exception:
+            except Exception as exc:
+                print(f"⚠️ Failed to fetch reset message channel {channel_id}: {exc}")
                 continue
 
         if channel_id == PLOT_CHANNEL_ID:

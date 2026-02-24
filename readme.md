@@ -35,6 +35,7 @@ POINT_CHANNEL_ID=
 PLOT_CHANNEL_ID=
 GUILD_ID=
 RESIDENT_ROLE_ID=
+PEARL_ROLE_ID=
 VILLAGES= (comma seperated)
 
 🔒 Never commit this file! .env is in .gitignore for your safety.
@@ -57,9 +58,9 @@ python main.py
 | ------------ | ----------------------------------------------- |
 | `/point`     | Add a colored point to a named village map.     |
 | `/plot`      | Show a plot of a village’s data with fake dot.  |
-| `/plotclean` | Plot map without the fake decoy point.          |
+| `/plotdetailed` | Plot map without the fake decoy point.       |
 | `/villages`  | Show a summary of each village’s point stats.   |
-| `/help`      | Display all commands in a cute embed.           |
+| `/noob`      | Display all commands in a cute embed.           |
 | `/clearmaps` | 🔒 Clear all data in all villages (admin only). |
 
 ## 📁 Project Structure
