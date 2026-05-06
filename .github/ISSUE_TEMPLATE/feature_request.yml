@@ -1,0 +1,75 @@
+name: Feature Request
+description: Suggest an idea or enhancement for ScatterBot
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea. Please describe the problem and the proposed solution.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What user problem are you trying to solve?
+      placeholder: As a moderator/player, I want ... because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe your ideal solution.
+      placeholder: New command, behavior change, workflow update, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any workarounds or alternative approaches?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Commands / interactions
+        - Plotting / rendering
+        - Town tools
+        - XP / leaderboard
+        - Data / storage
+        - CI / workflows
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: What would make this request complete?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and Risks
+      description: Any migration concerns, backward-compatibility concerns, or risks?
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-Submission Checks
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: This request is scoped to one feature/change.
+          required: true

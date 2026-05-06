@@ -136,3 +136,8 @@ ScatterBot/
 ## Contributing
 
 Issues and pull requests are welcome.
+
+- Coding standards: [CODING_STANDARDS.md](CODING_STANDARDS.md)
+- Pull request template: [.github/pull_request_template.md](.github/pull_request_template.md)
+- Bug report template: [.github/ISSUE_TEMPLATE/bug_report.yml](.github/ISSUE_TEMPLATE/bug_report.yml)
+- Feature request template: [.github/ISSUE_TEMPLATE/feature_request.yml](.github/ISSUE_TEMPLATE/feature_request.yml)

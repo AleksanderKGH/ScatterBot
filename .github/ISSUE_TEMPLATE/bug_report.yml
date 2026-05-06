@@ -1,0 +1,106 @@
+name: Bug Report
+description: Report a reproducible problem in ScatterBot
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please provide as much detail as possible.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+      placeholder: Clear and concise description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps To Reproduce
+      description: Tell us exactly how to reproduce the issue.
+      placeholder: |
+        1. Run command ...
+        2. Provide input ...
+        3. Observe error ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      placeholder: What actually happened?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Area
+      options:
+        - Commands / interactions
+        - Plotting / rendering
+        - Town tools
+        - XP / leaderboard
+        - Data / storage
+        - CI / workflows
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or Traceback
+      description: Paste relevant error output.
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: Bot Version / Commit
+      description: Commit hash, branch, or release if known.
+      placeholder: main @ abc1234
+
+  - type: input
+    id: python
+    attributes:
+      label: Python Version
+      placeholder: "3.11"
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: Windows 11
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment Notes
+      description: Relevant setup details (without secrets).
+      placeholder: Discord.py version, guild context, command channel, etc.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-Submission Checks
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I removed secrets/tokens from logs and screenshots.
+          required: true
