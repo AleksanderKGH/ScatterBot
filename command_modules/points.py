@@ -1,6 +1,14 @@
 import discord
 import config
 import xp
+
+#inder here
+import subprocess
+import tempfile
+import json
+import os
+#inder end
+
 from data import load_data, save_data
 from utils import get_point_data, get_point_user
 from views import ConfirmYesterdayView, UndoPointView
@@ -269,3 +277,51 @@ async def handle_undo(interaction: discord.Interaction, village: str, deps: dict
         view=view,
         ephemeral=True
     )
+
+async def handle_tsp_plot(interaction: discord.Interaction, village: str, deps: dict):
+    refresh_data_cache = deps["refresh_data_cache"]
+    require_channel = deps["require_channel"]
+
+    current_data = refresh_data_cache()
+
+    if not await require_channel(config.PLOT_CHANNEL_ID, config.POINT_CHANNEL_ID)(interaction):
+        return
+
+    if village not in current_data or not current_data[village]:
+        await interaction.response.send_message("That village has no data.", ephemeral=True)
+        return
+
+    import subprocess, tempfile, json, os
+
+    temp_dir = tempfile.mkdtemp()
+    points_path = os.path.join(temp_dir, "points.json")
+
+    with open(points_path, "w") as f:
+        json.dump({village: current_data[village]}, f)
+
+    env = os.environ.copy()
+    env["INPUT"] = points_path
+    env["GROUP"] = village
+    env["OUTDIR"] = temp_dir
+
+    subprocess.run(
+        ["bash", "./tsp.sh"],
+        cwd=os.getcwd(),
+        env=env
+    )
+
+    image_path = os.path.join(temp_dir, "route.png")
+
+    if not os.path.exists(image_path):
+        await interaction.response.send_message("TSP render failed.", ephemeral=True)
+        return
+
+    file = discord.File(image_path, filename="route.png")
+
+    embed = discord.Embed(
+        title=f"🧠 {village} TSP Route",
+        color=discord.Color.purple()
+    )
+    embed.set_image(url="attachment://route.png")
+
+    await interaction.response.send_message(embed=embed, file=file, ephemeral=True)
