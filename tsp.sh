@@ -3,15 +3,22 @@
 ########################################
 # ⚙️ CONTROL PANEL
 ########################################
-#INPUT="$HOME/pearls.json"
-INPUT="$HOME/Downloads/points.json"
-BG="$HOME/Downloads/map2.png"
-OUTDIR="$HOME/tsp_output"
+# 🏘️ GROUP / VILLAGE SELECTOR
+GROUP="${GROUP:-Dogville}"
+GROUP_FILE="${GROUP// /_}"
+
+INPUT="${INPUT:-$(dirname "$0")/points.json}"
+OUTDIR="${OUTDIR:-$(dirname "$0")}"
+'''BG="${BG:-}"
+if [ ! -f "$BG" ]; then
+    echo "[WARN] BG missing: $BG"
+    BG=""
+fi'''
 
 WORLD_SIZE=160
 CANVAS_SIZE=1280
 
-TIME_LIMIT=100
+TIME_LIMIT="${TIME_LIMIT:-5}"
 
 SA_ITER=2000000
 SA_COOLING=0.99995
@@ -19,26 +26,28 @@ REFINE_PASSES=2
 
 SEED=42
 
-LINE_WIDTH=1.0
+LINE_WIDTH=1.3
 NODE_SIZE=8
 
 # 🎯 OFFSETS (UNCHANGED)
-X_OFFSET=13
+X_OFFSET=0
 Y_OFFSET=1
 
 # 🎯 CENTER SQUEEZE (UNCHANGED)
-X_SQUEEZE=0.934
+X_SQUEEZE=1.0 # 0.95
 Y_SQUEEZE=1.0
 
 # 🧱 VISUAL MARGIN
-MARGIN=100
+MARGIN=0 #104
 
-# 🏘️ GROUP / VILLAGE SELECTOR
-GROUP="An Bread Capital"
+
 
 # 🎨 OPTIONAL COLOR FILTER
 # leave empty "" = ALL COLORS
-COLOR_FILTER=""
+COLOR_FILTER="${COLOR_MODE:-}"
+if [ "$COLOR_FILTER" = "all" ]; then
+    COLOR_FILTER=""
+fi
 
 ########################################
 
@@ -61,8 +70,11 @@ if [ -z "$COLOR_FILTER" ]; then
     ' "$INPUT" > "$CSV"
 else
     jq -r --arg group "$GROUP" --arg color "$COLOR_FILTER" '
-        .[$group][]
-        | select((.color // "" | ascii_downcase) == ($color | ascii_downcase))
+        .[$group][] 
+        | select(
+            $color == "" 
+            or ((.color // "" | ascii_downcase) == ($color | ascii_downcase))
+        )
         | "\(.x),\(.y)"
     ' "$INPUT" > "$CSV"
 fi
@@ -272,13 +284,19 @@ if not best_route:
 with open(route_out,"w") as f:
     f.write("\n".join(str(i) for i in best_route))
 
+with open(os.path.join("$OUTDIR", "distance.txt"), "w") as f:
+    f.write(str(best_cost))
+
 print("BEST:", best_cost)
 EOF
 
 echo "[3/3] Rendering HD overlay..."
 
 python3 << EOF
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+plt.close("all")
 import matplotlib.image as mpimg
 from matplotlib.patches import Rectangle
 import os
@@ -341,22 +359,25 @@ ys = [p[1] for p in pts] + [pts[0][1]]
 
 bg = mpimg.imread(bg_path) if os.path.exists(bg_path) else None
 
-fig = plt.figure(figsize=(12.8,12.8), dpi=100)
-ax = plt.axes()
+fig, ax = plt.subplots(figsize=(12.8, 12.8), dpi=100)
 
-if bg is not None:
-    ax.imshow(bg, extent=[0,W,0,H])
+fig.patch.set_alpha(0)
+ax.set_facecolor((0,0,0,0))
 
-ax.add_patch(Rectangle((0,0),W,H,color="black",alpha=0.10))
+#if bg is not None:
+#    ax.imshow(bg, extent=[0,W,0,H])
+#
+#ax.add_patch(Rectangle((0,0),W,H,color="black",alpha=0.10))
 
-ax.plot(xs,ys,linewidth=$LINE_WIDTH,color="white")
-ax.scatter(xs[:-1],ys[:-1],s=$NODE_SIZE,color="white")
+ax.plot(xs,ys,linewidth=$LINE_WIDTH,color="white", alpha=1.0)
+ax.scatter(xs[:-1],ys[:-1],s=$NODE_SIZE,color="white", edgecolors="black", linewidths=0.3)
 
 ax.set_xlim(0,W)
 ax.set_ylim(0,H)
 ax.axis("off")
 
-plt.savefig("$PNG", bbox_inches="tight", pad_inches=0)
+plt.savefig("$PNG", bbox_inches=None, pad_inches=0, transparent=True)
+plt.close(fig)
 EOF
 
 echo

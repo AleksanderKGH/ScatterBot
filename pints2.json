@@ -1,0 +1,26 @@
+{
+  "Dogville": [
+    {
+      "x": -160.0,
+      "y": 160.0,
+      "color": "yellow",
+      "user_id": 1484801079127445664
+    },
+    {
+      "x": -160.0,
+      "y": 160.0,
+      "color": "white",
+      "user_id": 1484801079127445664
+    }
+  ],
+  "An Bread Capital": [],
+  "Yeastopia": [
+    {
+      "x": 55.0,
+      "y": 55.0,
+      "color": "yellow",
+      "user_id": 1484801079127445664
+    }
+  ],
+  "Honey Wheat Hallow": []
+}

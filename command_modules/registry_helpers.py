@@ -1,3 +1,4 @@
+#registry_helpers.py
 from __future__ import annotations
 
 from discord import app_commands
@@ -14,6 +15,7 @@ def build_points_deps(
     set_cached_data_fn,
     generate_plot_fn,
     get_top_contributors_fn,
+    handle_cook_fn,
 ) -> dict:
     return {
         "refresh_data_cache": refresh_data_cache_fn,
@@ -26,6 +28,7 @@ def build_points_deps(
         "set_cached_data": set_cached_data_fn,
         "generate_plot": generate_plot_fn,
         "get_top_contributors": get_top_contributors_fn,
+        "handle_cook": handle_cook_fn,
     }
 
 
@@ -53,7 +56,12 @@ def build_town_deps(
     }
 
 
-def build_admin_deps(require_channel_fn, clear_all_points_fn, confirm_clear_view_cls, log_action_fn) -> dict:
+def build_admin_deps(
+    require_channel_fn,
+    clear_all_points_fn,
+    confirm_clear_view_cls,
+    log_action_fn,
+) -> dict:
     return {
         "require_channel": require_channel_fn,
         "clear_all_points": clear_all_points_fn,
