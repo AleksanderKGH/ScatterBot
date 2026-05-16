@@ -1,12 +1,43 @@
+#points.py
 import discord
 import config
 import xp
+
+#inder here
+import asyncio
+import subprocess
+import tempfile
+import json
+import os
+import io
+import hashlib
+import shutil
+#inder end
+
 from data import load_data, save_data
 from utils import get_point_data, get_point_user
 from views import ConfirmYesterdayView, UndoPointView
+from collections import defaultdict
+temp_dir = tempfile.gettempdir()
 
+NEW_POINTS = defaultdict(lambda: True)
+PLOT_CACHE: dict[str, dict] = {}
+COOK_CACHE: dict[tuple, dict] = {}
+
+COOKING: dict[str, dict] = {}
+COOK_ID = defaultdict(int)
+
+VILLAGE_ALIASES = {
+    "capital": "An Bread Capital",
+}
+LAST_COOK_SECONDS: dict[tuple[str, str], int] = {}
 
 async def handle_point(interaction: discord.Interaction, x: float, y: float, color: str, village: str, deps: dict):
+    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    if not village:
+        await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
+        return
+
     refresh_data_cache = deps["refresh_data_cache"]
     require_channel = deps["require_channel"]
     load_yesterdays_points = deps["load_yesterdays_points"]
@@ -16,9 +47,19 @@ async def handle_point(interaction: discord.Interaction, x: float, y: float, col
     send_milestone_message = deps["send_milestone_message"]
     set_cached_data = deps["set_cached_data"]
 
+    # ─────────────────────────────────────────
+    # LOAD DATA FIRST (correct order)
+    # ─────────────────────────────────────────
     current_data = refresh_data_cache()
+    data = current_data.get(village, [])
+    data_hash = make_data_hash(data)
+
     if not await require_channel(config.POINT_CHANNEL_ID)(interaction):
         return
+
+    # ─────────────────────────────────────────
+    # VALIDATION
+    # ─────────────────────────────────────────
     if not (-160 <= x <= 160) or not (-160 <= y <= 160):
         await interaction.response.send_message(
             f"🚫 Coordinates must be between -160 and 160. You entered: ({x}, {y})",
@@ -43,6 +84,9 @@ async def handle_point(interaction: discord.Interaction, x: float, y: float, col
     if village not in current_data:
         current_data[village] = []
 
+    # ─────────────────────────────────────────
+    # DUPLICATE CHECK
+    # ─────────────────────────────────────────
     if any(get_point_data(existing) == (x, y, color.lower()) for existing in current_data[village]):
         await interaction.response.send_message(
             f"🚫 That point already exists in '{village}' with the same color.",
@@ -50,8 +94,12 @@ async def handle_point(interaction: discord.Interaction, x: float, y: float, col
         )
         return
 
+    # ─────────────────────────────────────────
+    # YESTERDAY CHECK
+    # ─────────────────────────────────────────
     yesterdays_data = load_yesterdays_points()
     y_points = yesterdays_data.get(village, [])
+
     if any(
         round(get_point_data(existing)[0], 2) == round(x, 2) and
         round(get_point_data(existing)[1], 2) == round(y, 2) and
@@ -70,11 +118,23 @@ async def handle_point(interaction: discord.Interaction, x: float, y: float, col
         if not view.confirmed:
             return
 
+    # ─────────────────────────────────────────
+    # APPLY POINT
+    # ─────────────────────────────────────────
     new_point = create_point(x, y, color, user_id=interaction.user.id)
     current_data[village].append(new_point)
-    save_data(current_data)
-    set_cached_data(current_data)
 
+    save_data(current_data)
+    set_cached_data(refresh_data_cache())
+
+    PLOT_CACHE.pop(village, None)
+    for key in list(COOK_CACHE.keys()):
+        if key[0] == village:
+            del COOK_CACHE[key]
+
+    # ─────────────────────────────────────────
+    # XP SYSTEM
+    # ─────────────────────────────────────────
     old_xp = xp.get_user_xp(interaction.user.id)
     new_xp = xp.add_xp(interaction.user.id, 1)
 
@@ -89,11 +149,25 @@ async def handle_point(interaction: discord.Interaction, x: float, y: float, col
         color_milestone = check_milestone(old_color_count, new_color_count)
 
         if xp_milestone:
-            await send_milestone_message(interaction.client, interaction.user.id, "Total XP", xp_milestone)
+            await send_milestone_message(
+                interaction.client,
+                interaction.user.id,
+                "Total XP",
+                xp_milestone
+            )
 
         if color_milestone:
-            await send_milestone_message(interaction.client, interaction.user.id, f"{color.capitalize()} Pearls", color_milestone, "pearls mapped")
+            await send_milestone_message(
+                interaction.client,
+                interaction.user.id,
+                f"{color.capitalize()} Pearls",
+                color_milestone,
+                "pearls mapped"
+            )
 
+    # ─────────────────────────────────────────
+    # LOG + RESPONSE
+    # ─────────────────────────────────────────
     await log_action(interaction, f"Added ({x}, {y}, {color}) to **{village}**")
 
     success_embed = discord.Embed(
@@ -111,6 +185,27 @@ async def handle_point(interaction: discord.Interaction, x: float, y: float, col
 
 
 async def handle_plot(interaction: discord.Interaction, village: str, deps: dict):
+    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    if not village:
+        await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
+        return
+    cached = PLOT_CACHE.get(village)
+
+    if cached:
+        current_data = refresh_data_cache()
+        current_hash = make_data_hash(current_data.get(village, []))
+
+        if cached["hash"] == current_hash:
+            buf = cached["buf"]
+            embed = cached["embed"]
+            buf.seek(0)
+
+            await interaction.response.send_message(
+                embed=embed,
+                file=discord.File(buf, "map.png"),
+                ephemeral=True
+            )
+            return
     refresh_data_cache = deps["refresh_data_cache"]
     require_channel = deps["require_channel"]
     generate_plot = deps["generate_plot"]
@@ -157,8 +252,20 @@ async def handle_plot(interaction: discord.Interaction, village: str, deps: dict
     file = discord.File(buf, "map.png")
     await interaction.response.send_message(embed=embed, file=file, ephemeral=True)
 
+    #inder here
+    PLOT_CACHE[village] = {
+        "count": len(current_data[village]),
+        "hash": make_data_hash(current_data[village]),
+        "buf": buf,
+        "embed": embed
+    }
+    #inder out
 
 async def handle_plot_detailed(interaction: discord.Interaction, village: str, deps: dict):
+    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    if not village:
+        await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
+        return
     refresh_data_cache = deps["refresh_data_cache"]
     require_channel = deps["require_channel"]
     generate_plot = deps["generate_plot"]
@@ -219,9 +326,15 @@ async def handle_villages(interaction: discord.Interaction, deps: dict):
 
 
 async def handle_undo(interaction: discord.Interaction, village: str, deps: dict):
+    
+    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    if not village:
+        await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
+        return
     require_channel = deps["require_channel"]
 
     is_admin_channel = interaction.channel_id == config.LOG_CHANNEL_ID
+
     if not await require_channel(config.POINT_CHANNEL_ID, config.LOG_CHANNEL_ID)(interaction):
         return
 
@@ -243,16 +356,12 @@ async def handle_undo(interaction: discord.Interaction, village: str, deps: dict
         ]
 
     if not points_with_indices:
-        if is_admin_channel:
-            await interaction.response.send_message(
-                f"❌ No points to remove from **{village}**.",
-                ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                f"❌ You haven't added any points to **{village}** yet.",
-                ephemeral=True
-            )
+        msg = (
+            f"❌ No points to remove from **{village}**."
+            if is_admin_channel
+            else f"❌ You haven't added any points to **{village}** yet."
+        )
+        await interaction.response.send_message(msg, ephemeral=True)
         return
 
     points_with_indices.reverse()
@@ -269,3 +378,295 @@ async def handle_undo(interaction: discord.Interaction, village: str, deps: dict
         view=view,
         ephemeral=True
     )
+async def handle_cook(interaction: discord.Interaction, color: str, village: str, seconds: int, deps: dict):
+    safe_village = village.strip() if village else "Dogville"
+    safe_village = safe_village.replace(" ", "_")
+    await interaction.response.defer(ephemeral=True)
+    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    color = (color or "all").strip().lower()
+    if color in ("", "default", "all"):
+        color = "all"
+    if not village:
+        await interaction.edit_original_response(content="❌ Invalid village.")
+        return
+    cook_scope = (village, color)
+    last = LAST_COOK_SECONDS.get(cook_scope, 0)
+    if seconds <= last:
+        await interaction.edit_original_response(
+            content=f"❌ You must use a higher cook time than the previous run.\n"
+                    f"Current: **{seconds}s** | Required: **>{last}s**"
+        )
+        return
+    refresh_data_cache = deps["refresh_data_cache"]
+    require_channel = deps["require_channel"]
+    generate_plot = deps["generate_plot"]
+
+    current_data = refresh_data_cache()
+
+    if not await require_channel(
+        config.PLOT_CHANNEL_ID,
+        config.POINT_CHANNEL_ID
+    )(interaction):
+        return
+
+    if village not in current_data or not current_data[village]:
+        await interaction.edit_original_response(content="That village has no data.")
+        return
+
+    if seconds < 1 or seconds > 500:
+        await interaction.edit_original_response(content="Seconds must be 1–200.")
+        return
+
+    current_data = refresh_data_cache()
+    data = current_data.get(village, [])
+    data_hash = make_data_hash(data)
+
+    cache_key = (village, color.lower(), seconds, data_hash)
+
+    latest_cached = None
+
+    for key, value in COOK_CACHE.items():
+        cached_village, cached_color, _, _ = key
+
+        if cached_village != village:
+            continue
+
+        if cached_color != color.lower():
+            continue
+
+        if (
+            latest_cached is None or
+            value.get("seconds", 0) > latest_cached.get("seconds", 0)
+        ):
+            latest_cached = value
+    old_distance = None
+
+    if latest_cached:
+        old_distance = latest_cached.get("distance")
+
+    # EXACT CACHE HIT
+    cached = COOK_CACHE.get(cache_key)
+
+    if cached and cached.get("hash") == data_hash:
+        buf = cached["buf"]
+        embed = cached["embed"]
+
+        buf.seek(0)
+
+        await interaction.followup.send(
+            embed=embed,
+            file=discord.File(buf, "route.png"),
+            ephemeral=True
+        )
+        return
+
+    # SHOW OLD RESULT IMMEDIATELY WHILE NEW ONE COOKS
+    if latest_cached:
+        old_buf = latest_cached["buf"]
+        old_embed = latest_cached["embed"]
+
+        old_buf.seek(0)
+
+        await interaction.followup.send(
+            content="♻️ Showing previous cook while generating updated route...",
+            embed=old_embed,
+            file=discord.File(old_buf, "route.png"),
+            ephemeral=True
+        )
+
+    COOK_ID[village] += 1
+    job_id = COOK_ID[village]
+
+    existing = COOKING.get(village)
+
+    if isinstance(existing, dict):
+        existing["cancelled"] = True
+
+        COOKING[village] = {
+            "job_id": job_id,
+            "seconds": seconds
+        }
+    elif existing is not None:
+        COOKING.pop(village, None)
+
+    COOKING[village] = {"job_id": job_id,"seconds": seconds}
+
+    await interaction.edit_original_response(
+        content=f"⏳ Starting cook for **{village}**... ({seconds}s)"
+    )
+
+    buf_plot, _ = generate_plot(village,data,include_fake=True,user_id=interaction.user.id)
+    plot_path = os.path.join(temp_dir, f"{safe_village}_bg.png")
+    # IMPORTANT: force safe filename (NO SPACES ISSUES)
+
+    with open(plot_path, "wb") as f:
+        f.write(buf_plot.getvalue())
+
+    bg_path = plot_path
+    old_distance = latest_cached.get("distance") if latest_cached else None
+
+    asyncio.create_task(_cook_worker(interaction,village,safe_village,color,seconds,deps,job_id,plot_path,data_hash,old_distance))
+async def run_countdown(village, job_id, seconds, update_status):
+    state = COOKING.get(village)
+    if not state or state.get("job_id") != job_id or state.get("cancelled"):
+        return
+    for i in range(seconds):
+        state = COOKING.get(village)
+        if not state or state.get("job_id") != job_id or state.get("cancelled"):
+            return
+        await update_status("Cooking", seconds - i)
+        await asyncio.sleep(1)
+
+async def _cook_worker(interaction, village, safe_village, color, seconds, deps, job_id, bg_path, data_hash, old_distance):
+    refresh_data_cache = deps["refresh_data_cache"]
+    cook_scope = (village, color.lower())
+    LAST_COOK_SECONDS[cook_scope] = seconds
+    cache_key = (village, color.lower(), seconds, data_hash)
+
+    async def update_status(stage, remaining=None):
+        state = COOKING.get(village)
+        if not isinstance(state, dict) or state.get("job_id") != job_id or state.get("cancelled"):
+            return
+        msg = f"🚶 **Cooking {village}**\n\nStatus: **{stage}**"
+        if remaining is not None:
+            msg += f"\n⏳ Time left: **{remaining}s / {seconds}s**"
+        await interaction.edit_original_response(content=msg)
+
+    def run_render_sync(env, temp_dir):
+        subprocess.run(
+            ["bash", "./tsp.sh"],
+            cwd=os.getcwd(),
+            env=env
+        )
+        return os.path.join(temp_dir, "route.png")
+
+    try:
+        plot_path = os.path.join(temp_dir, f"{safe_village}_bg.png")
+        points_path = os.path.join(temp_dir, "points.json")
+
+        fresh_data = refresh_data_cache()
+        village_points = fresh_data.get(village, [])
+
+        with open(points_path, "w") as f:
+            json.dump({village: village_points}, f)
+
+        env = os.environ.copy()
+        env.update({
+            "INPUT": points_path,
+            "GROUP": village,
+            "OUTDIR": temp_dir,
+            "COLOR_MODE": color,
+            "SECONDS": str(seconds),
+            "TIME_LIMIT": str(seconds + 3),
+            "BG": os.path.abspath(bg_path),
+        })
+
+        # 🚀 START BOTH IMMEDIATELY (NO DEPENDENCY)
+        render_task = asyncio.create_task(
+            asyncio.to_thread(run_render_sync, env, temp_dir)
+        )
+
+        countdown_task = asyncio.create_task(
+            run_countdown(village, job_id, seconds, update_status)
+        )
+
+        image_path = await render_task
+        await countdown_task
+
+        distance_path = os.path.join(temp_dir, "distance.txt")
+
+        distance = None
+
+        if os.path.exists(distance_path):
+            with open(distance_path) as f:
+                try:
+                    distance = float(f.read().strip())
+                except:
+                    distance = None
+
+        if not os.path.exists(image_path):
+            await interaction.edit_original_response(content="❌ Walk render failed.")
+            return
+
+        await update_status("Done")
+        from PIL import Image
+        import matplotlib.image as mpimg
+        base = Image.open(bg_path).convert("RGBA")
+        tsp = Image.open(image_path).convert("RGBA")
+        # Ensure both images are same size + RGBA before compositing
+        tsp = tsp.convert("RGBA")
+
+        if base.size != tsp.size:
+            tsp = tsp.resize(base.size, Image.Resampling.LANCZOS)
+
+        base = Image.alpha_composite(base.convert("RGBA"), tsp)
+        buf = io.BytesIO()
+        base.save(buf, format="PNG")
+        buf.seek(0)
+
+        improvement_text = ""
+        if (
+            old_distance is not None and
+            distance is not None
+        ):
+            diff = old_distance - distance
+
+            if diff > 0:
+                improvement_text = f"\n📉 Improved by `{diff:,.2f}`"
+            elif diff < 0:
+                improvement_text = f"\n📈 Worse by `{abs(diff):,.2f}`"
+            else:
+                improvement_text = "\n➖ Same distance"
+
+        desc = f"Mode: {color} | Duration: {seconds}s"
+
+        if distance is not None:
+            desc += f"\n📏 Distance: `{distance:,.2f}`"
+
+        desc += improvement_text
+
+        embed = discord.Embed(
+            title=f"🚶 {village} Walk Simulation",
+            description=desc,
+            color=discord.Color.purple()
+        )
+        embed.set_image(url="attachment://route.png")
+
+        COOK_CACHE[cache_key] = {"seconds": seconds, "hash": data_hash, "buf": buf, "embed": embed, "distance": distance}
+        PLOT_CACHE.pop(village, None)
+
+        await interaction.followup.send(
+            embed=embed,
+            file=discord.File(buf, "route.png"),
+            ephemeral=True
+        )
+
+    finally:
+        state = COOKING.get(village)
+        if state and state.get("job_id") == job_id:
+            del COOKING[village]
+
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+def make_data_hash(data):
+    return hashlib.md5(
+        json.dumps(data, sort_keys=True).encode()
+    ).hexdigest()
+
+def normalize_village_input(village: str, valid_villages: list[str]) -> str | None:
+    v = village.strip().lower()
+    for real in valid_villages:
+        if real.lower() == v:
+            return real
+    return None
+async def resolve_village(interaction: discord.Interaction, village: str, valid_villages: list[str]) -> str | None:
+    village = normalize_village_input(village, valid_villages)
+
+    if not village:
+        await interaction.response.send_message(
+            "❌ Invalid village.",
+            ephemeral=True
+        )
+        return None
+
+    return village
