@@ -9,11 +9,6 @@ GROUP_FILE="${GROUP// /_}"
 
 INPUT="${INPUT:-$(dirname "$0")/points.json}"
 OUTDIR="${OUTDIR:-$(dirname "$0")}"
-'''BG="${BG:-}"
-if [ ! -f "$BG" ]; then
-    echo "[WARN] BG missing: $BG"
-    BG=""
-fi'''
 
 WORLD_SIZE=160
 CANVAS_SIZE=1280
@@ -63,21 +58,27 @@ echo "[1/3] Extracting coordinates..."
 # =========================
 # SAFE GROUP + OPTIONAL COLOR FILTER
 # =========================
-if [ -z "$COLOR_FILTER" ]; then
-    jq -r --arg group "$GROUP" '
-        .[$group][]
-        | "\(.x),\(.y)"
-    ' "$INPUT" > "$CSV"
-else
-    jq -r --arg group "$GROUP" --arg color "$COLOR_FILTER" '
-        .[$group][] 
-        | select(
-            $color == "" 
-            or ((.color // "" | ascii_downcase) == ($color | ascii_downcase))
-        )
-        | "\(.x),\(.y)"
-    ' "$INPUT" > "$CSV"
-fi
+python3 << EOF
+import json
+
+group = "$GROUP"
+color = "$COLOR_FILTER".lower()
+
+with open("$INPUT") as f:
+    data = json.load(f)
+
+points = data.get(group, [])
+
+with open("$CSV", "w") as out:
+    for p in points:
+        pcolor = str(p.get("color", "")).lower()
+
+        if color and color != "":
+            if pcolor != color:
+                continue
+
+        out.write(f"{p['x']},{p['y']}\n")
+EOF
 
 echo "[2/3] Cooking (CRASH-PROOF $TIME_LIMIT sec)..."
 
@@ -219,8 +220,8 @@ def insertion():
 # SA
 # =========================
 def SA(route):
-    if N == 0:
-        return []
+    if N < 2:
+        return route  # or fallback()
 
     T = 1000.0
     cooling = $SA_COOLING
@@ -230,7 +231,10 @@ def SA(route):
 
     while not time_up():
 
-        i,j = sorted(random.sample(range(N),2))
+        if N < 2:
+            break
+
+        i, j = sorted(random.sample(range(N), 2))
         new = route[:]
 
         if random.random() < 0.5:
