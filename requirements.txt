@@ -1,5 +1,4 @@
 discord.py>=2.3.2
-matplotlib>=3.8.4
+matplotlib>=3.10.9
 python-dotenv>=1.0.1
 Pillow
-packaging
