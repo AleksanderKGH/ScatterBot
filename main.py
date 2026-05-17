@@ -2,7 +2,6 @@ import discord
 import json
 import os
 from datetime import datetime
-from datetime import datetime, timezone
 from discord.ext import tasks
 from config import TOKEN, LOG_CHANNEL_ID, GUILD_ID, PLOT_CHANNEL_ID, POINT_CHANNEL_ID
 from commands import register_commands, clear_all_points
@@ -113,13 +112,12 @@ async def on_ready():
 @tasks.loop(minutes=1)
 async def reset_loop():
     global last_reset_date
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.utcnow().strftime("%Y-%m-%d")
     if last_reset_date == today:
         return
 
     _, goats, daily_stats = clear_all_points()
     await send_reset_messages(goats, daily_stats)
-
     last_reset_date = today
     save_last_reset_date(today)
 

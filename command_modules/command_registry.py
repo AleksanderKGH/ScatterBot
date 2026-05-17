@@ -1,4 +1,3 @@
-#command_registry.py
 from __future__ import annotations
 
 import discord
@@ -42,7 +41,6 @@ def register_commands(
         set_cached_data_fn=set_cached_data_fn,
         generate_plot_fn=generate_plot_fn,
         get_top_contributors_fn=get_top_contributors_fn,
-        handle_cook_fn=points_module.handle_cook,
     )
 
     town_deps = registry_helpers_module.build_town_deps(
@@ -63,34 +61,7 @@ def register_commands(
         confirm_clear_view_cls=confirm_clear_view_cls,
         log_action_fn=log_action_fn,
     )
-    @tree.command(name="cook", description="Generate TSP route image")
-    @app_commands.describe(
-        seconds="Cook duration",
-        village="Village name",
-        color="Color filter"
-    )
-    async def cook(interaction: discord.Interaction, seconds: int | None = None, village: str | None = None, color: str | None = None):
-        seconds = seconds or 7
-        village = village or "Dogville"
-        color = color or ""
 
-        if seconds < 1 or seconds > 500:
-            await interaction.response.send_message("❌ seconds must be between 1 and 500", ephemeral=True)
-            return
-        await points_module.handle_cook(interaction, color, village, seconds, points_deps)
-    @cook.autocomplete("color")
-    async def cook_color_autocomplete(interaction: discord.Interaction, current: str):
-        return registry_helpers_module.color_autocomplete_choices(
-            current,
-            config_module.COLOR_OPTIONS
-        )
-
-    @cook.autocomplete("village")
-    async def cook_village_autocomplete(interaction: discord.Interaction, current: str):
-        return registry_helpers_module.village_autocomplete_choices(
-            current,
-            config_module.VILLAGE_OPTIONS
-        )
     @tree.command(name="point", description="Add a point to a village!")
     @app_commands.describe(
         x="X coordinate (-160 to 160)",
@@ -114,7 +85,6 @@ def register_commands(
 
     @tree.command(name="plot", description="Plot points from a village.")
     @app_commands.describe(village="Village name (optional)")
-    @app_commands.autocomplete(village=village_autocomplete)
     async def plot(interaction: discord.Interaction, village: str = "Dogville"):
         await points_module.handle_plot(interaction, village, points_deps)
 
@@ -182,7 +152,3 @@ def register_commands(
     @app_commands.describe(enabled="Enable incognito mode (hide from leaderboard)")
     async def incognito(interaction: discord.Interaction, enabled: bool):
         await admin_module.handle_incognito(interaction, enabled)
-
-    @tree.command(name="json", description="Export points.json")
-    async def export_json(interaction: discord.Interaction):
-        await admin_module.handle_json_export(interaction, admin_deps)
