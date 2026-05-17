@@ -25,11 +25,6 @@ def _require_int(name: str) -> int:
     except ValueError as exc:
         raise ValueError(f"Environment variable {name} must be an integer, got: {raw!r}") from exc
 
-ADMIN_USER_IDS = [
-    int(x)
-    for x in os.getenv("ADMIN_USER_IDS", "").split(",")
-    if x.strip()
-]
 
 TOKEN = _require_str("DISCORD_TOKEN")
 LOG_CHANNEL_ID = _require_int("LOG_CHANNEL_ID")
