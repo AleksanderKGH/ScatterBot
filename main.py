@@ -1,7 +1,7 @@
 import discord
 import json
 import os
-from datetime import datetime, UTC
+from datetime import datetime
 from discord.ext import tasks
 from config import TOKEN, LOG_CHANNEL_ID, GUILD_ID, PLOT_CHANNEL_ID, POINT_CHANNEL_ID
 from commands import register_commands, clear_all_points
@@ -103,7 +103,7 @@ async def on_ready():
     if last_reset_date is None:
         last_reset_date = load_last_reset_date()
         if last_reset_date is None:
-            today = datetime.now(UTC).strftime("%Y-%m-%d")
+            last_reset_date = datetime.utcnow().strftime("%Y-%m-%d")
             save_last_reset_date(last_reset_date)
     if not reset_loop.is_running():
         reset_loop.start()
@@ -112,7 +112,7 @@ async def on_ready():
 @tasks.loop(minutes=1)
 async def reset_loop():
     global last_reset_date
-    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    today = datetime.utcnow().strftime("%Y-%m-%d")
     if last_reset_date == today:
         return
 
