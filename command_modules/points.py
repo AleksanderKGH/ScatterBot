@@ -190,6 +190,12 @@ async def handle_plot(interaction: discord.Interaction, village: str, deps: dict
     if not village:
         await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
         return
+    refresh_data_cache = deps["refresh_data_cache"]
+    require_channel = deps["require_channel"]
+    generate_plot = deps["generate_plot"]
+    get_top_contributors = deps["get_top_contributors"]
+    log_action = deps["log_action"]
+
     cached = PLOT_CACHE.get(village)
 
     if cached:
