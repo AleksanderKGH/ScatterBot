@@ -1,3 +1,4 @@
+#rendering.py
 from __future__ import annotations
 
 from datetime import datetime
@@ -9,6 +10,13 @@ import discord
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from PIL import Image
+
+import matplotlib as mpl
+
+mpl.rcParams.update({
+    "savefig.bbox": "standard",
+    "figure.autolayout": False
+})
 
 
 def normalize_house_size(footprint: dict, rotation: int) -> tuple[float, float]:
@@ -409,7 +417,14 @@ def generate_town_layout_plot(
     ax.axvline(x=0, color="black", linewidth=1)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.2)
+
+    fig.savefig(
+        buf,
+        format="png",
+        bbox_inches=None,
+        pad_inches=0.2
+    )
+
     buf.seek(0)
     plt.close(fig)
 
@@ -491,7 +506,7 @@ def generate_chunk_plot(
     ax.grid(True, linestyle="--", linewidth=0.5, color="gray", zorder=0)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.2)
+    fig.savefig(buf, format="png", bbox_inches=None, pad_inches=0.2)
     buf.seek(0)
     plt.close(fig)
 
@@ -502,7 +517,7 @@ def generate_chunk_plot(
     }
     return buf, stats
 
-
+plt.close("all")
 def generate_plot(
     village: str,
     points: list,
@@ -513,15 +528,22 @@ def generate_plot(
     color_options: list[str],
 ) -> tuple[io.BytesIO, tuple[int, int, str] | None]:
     fig, ax = plt.subplots(figsize=(6, 6))
+    ax.clear()
 
+    safe_village = village.replace(" ", "_")
     for ext in [".png", ".jpg", ".jpeg"]:
-        path = f"{village}{ext}"
+        path = f"{safe_village}{ext}"
         if os.path.exists(path):
             try:
                 print(f"Attempting to load: {path}")
                 img = Image.open(path)
-                ax.imshow(img, extent=[160, -160, -160, 160], zorder=0)
+                ax.imshow(
+                    img,
+                    extent=[160, -160, -160, 160],
+                    zorder=0
+                )
                 break
+
             except Exception as exc:
                 print(f"Image load failed for {village} at {path}: {exc}")
                 break
@@ -531,6 +553,23 @@ def generate_plot(
         plot_color = plot_colors.get(color.lower(), color.lower())
         ax.scatter(x, y, color=plot_color, s=50, edgecolors="black")
         ax.text(x, y - 4, f"({int(x)}, {int(y)})", fontsize=10, color="black", ha="center", va="top")
+
+    tsp_path = os.path.join(os.getcwd(), "route.png")
+
+    if os.path.exists(tsp_path):
+        try:
+            import matplotlib.image as mpimg
+
+            tsp_img = mpimg.imread(tsp_path)
+
+            ax.imshow(
+                tsp_img,
+                extent=[-160, 160, -160, 160],
+                zorder=2.2,
+                alpha=1.0
+            )
+        except Exception as e:
+            print("TSP overlay failed:", e)
 
     if include_fake and user_id is not None:
         date_seed = datetime.utcnow().strftime("%Y-%m-%d")
@@ -563,12 +602,13 @@ def generate_plot(
     ax.set_ylim(-160, 160)
     ax.set_xticks([x for x in range(160, -161, -20)])
     ax.set_yticks([y for y in range(-160, 161, 20)])
-    ax.grid(True, linestyle="--", linewidth=0.5, color="gray", zorder=0)
+    ax.grid(True, linestyle="--", linewidth=0.5, color="gray", zorder=10)
     ax.axhline(y=0, color="black", linewidth=1)
     ax.axvline(x=0, color="black", linewidth=1)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.2)
+    fig.savefig(buf, format="png", bbox_inches=None, pad_inches=0.2)
     buf.seek(0)
+    plt.close(fig)
     plt.close(fig)
     return buf, return_info

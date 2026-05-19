@@ -41,7 +41,29 @@ def register_commands(
         set_cached_data_fn=set_cached_data_fn,
         generate_plot_fn=generate_plot_fn,
         get_top_contributors_fn=get_top_contributors_fn,
+        handle_cook_fn=points_module.handle_cook,
     )
+    @tree.command(name="cook", description="Generate TSP route image")
+    async def cook(
+        interaction: discord.Interaction,
+        color: str = "",
+        village: str = "Dogville",
+        seconds: int = 7
+    ):
+        if seconds < 1 or seconds > 500:
+            await interaction.response.send_message(
+                "❌ seconds must be between 5 and 200",
+                ephemeral=True
+            )
+            return
+
+        await points_module.handle_cook(
+            interaction,
+            color,
+            village,
+            seconds,
+            points_deps
+        )
 
     town_deps = registry_helpers_module.build_town_deps(
         require_channel_fn=require_channel_fn,
@@ -85,6 +107,7 @@ def register_commands(
 
     @tree.command(name="plot", description="Plot points from a village.")
     @app_commands.describe(village="Village name (optional)")
+    @app_commands.autocomplete(village=village_autocomplete)
     async def plot(interaction: discord.Interaction, village: str = "Dogville"):
         await points_module.handle_plot(interaction, village, points_deps)
 
