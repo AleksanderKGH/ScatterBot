@@ -542,7 +542,7 @@ async def _cook_worker(interaction, village, safe_village, color, seconds, deps,
 
     def run_render_sync(env, temp_dir):
         subprocess.run(
-            [sys.executable, "tsp.py"],
+            [sys.executable, "command_modules/tsp.py"],
             cwd=os.getcwd(),
             env=env,
             check=True
