@@ -64,7 +64,20 @@ def register_commands(
             seconds,
             points_deps
         )
+    @cook.autocomplete("color")
+    async def cook_color_autocomplete(interaction: discord.Interaction, current: str):
+        return registry_helpers_module.color_autocomplete_choices(
+            current,
+            config_module.COLOR_OPTIONS
+        )
 
+
+    @cook.autocomplete("village")
+    async def cook_village_autocomplete(interaction: discord.Interaction, current: str):
+        return registry_helpers_module.village_autocomplete_choices(
+            current,
+            config_module.VILLAGE_OPTIONS
+        )
     town_deps = registry_helpers_module.build_town_deps(
         require_channel_fn=require_channel_fn,
         generate_town_layout_plot_fn=generate_town_layout_plot_fn,
