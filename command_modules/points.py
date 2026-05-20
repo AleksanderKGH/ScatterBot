@@ -134,6 +134,8 @@ async def handle_point(interaction: discord.Interaction, x: float, y: float, col
     # 🔥 invalidate versions
     VILLAGE_VERSION[village] += 1
     VILLAGE_COLOR_COUNT[(village, color.lower())] += 1
+    LAST_COOK_SECONDS[(village, "all")] = 0
+    LAST_COOK_SECONDS[(village, color.lower())] = 0
 
     PLOT_CACHE.pop(village, None)
     for key in list(COOK_CACHE.keys()):
@@ -340,11 +342,12 @@ async def handle_villages(interaction: discord.Interaction, deps: dict):
 
 
 async def handle_undo(interaction: discord.Interaction, village: str, deps: dict):
-    
+
     village = normalize_village_input(village, config.VILLAGE_OPTIONS)
     if not village:
         await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
         return
+
     require_channel = deps["require_channel"]
 
     is_admin_channel = interaction.channel_id == config.LOG_CHANNEL_ID
@@ -386,10 +389,26 @@ async def handle_undo(interaction: discord.Interaction, village: str, deps: dict
         points_with_indices=points_with_indices,
         is_admin=is_admin_channel
     )
-    removed = point
+
+    # IMPORTANT: attach deleted point AFTER selection, not placeholder
+    removed = points_with_indices[0][1]
+
     color = get_point_data(removed)[2].lower()
-    VILLAGE_VERSION[village] += 1
-    VILLAGE_COLOR_COUNT[(village, color)] += 1
+
+    # ─────────────────────────────────────────
+    # FIX VERSIONING (UNDO = REVERT CHANGE)
+    # ─────────────────────────────────────────
+    VILLAGE_VERSION[village] = max(0, VILLAGE_VERSION[village] - 1)
+    VILLAGE_COLOR_COUNT[(village, color)] = max(
+        0,
+        VILLAGE_COLOR_COUNT[(village, color)] - 1
+    )
+
+    # ─────────────────────────────────────────
+    # RESET COOK LOCK (THIS IS WHAT YOU WANTED)
+    # ─────────────────────────────────────────
+    LAST_COOK_SECONDS[(village, "all")] = 0
+    LAST_COOK_SECONDS[(village, color)] = 0
 
     await interaction.response.send_message(
         embed=view.get_embed(),
@@ -420,7 +439,7 @@ async def handle_cook(interaction: discord.Interaction, color: str, village: str
         )
         return
     if color == "all":
-        if seconds <= last_village_change:
+        if seconds < last_village_change:
             await interaction.edit_original_response(
                 content=(
                     f"❌ No new pearls detected.\n"
@@ -469,7 +488,7 @@ async def handle_cook(interaction: discord.Interaction, color: str, village: str
     latest_cached = None
 
     for key, value in COOK_CACHE.items():
-        cached_village, cached_color, _, _ = key
+        cached_village, cached_color, *_ = key
 
         if cached_village != village:
             continue
