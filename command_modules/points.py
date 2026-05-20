@@ -22,7 +22,6 @@ from views import ConfirmYesterdayView, UndoPointView
 from collections import defaultdict
 temp_dir = tempfile.gettempdir()
 
-NEW_POINTS = defaultdict(lambda: True)
 PLOT_CACHE: dict[str, dict] = {}
 COOK_CACHE: dict[tuple, dict] = {}
 
@@ -33,6 +32,9 @@ VILLAGE_ALIASES = {
     "capital": "An Bread Capital",
 }
 LAST_COOK_SECONDS: dict[tuple[str, str], int] = {}
+VILLAGE_VERSION: dict[str, int] = defaultdict(int)
+VILLAGE_COLOR_VERSION: dict[tuple[str, str], int] = defaultdict(int)
+VILLAGE_COLOR_COUNT: dict[tuple[str, str], int] = defaultdict(int)
 
 async def handle_point(interaction: discord.Interaction, x: float, y: float, color: str, village: str, deps: dict):
     village = normalize_village_input(village, config.VILLAGE_OPTIONS)
@@ -128,6 +130,10 @@ async def handle_point(interaction: discord.Interaction, x: float, y: float, col
 
     save_data(current_data)
     set_cached_data(refresh_data_cache())
+
+    # 🔥 invalidate versions
+    VILLAGE_VERSION[village] += 1
+    VILLAGE_COLOR_COUNT[(village, color.lower())] += 1
 
     PLOT_CACHE.pop(village, None)
     for key in list(COOK_CACHE.keys()):
@@ -380,6 +386,10 @@ async def handle_undo(interaction: discord.Interaction, village: str, deps: dict
         points_with_indices=points_with_indices,
         is_admin=is_admin_channel
     )
+    removed = point
+    color = get_point_data(removed)[2].lower()
+    VILLAGE_VERSION[village] += 1
+    VILLAGE_COLOR_COUNT[(village, color)] += 1
 
     await interaction.response.send_message(
         embed=view.get_embed(),
@@ -398,13 +408,35 @@ async def handle_cook(interaction: discord.Interaction, color: str, village: str
         await interaction.edit_original_response(content="❌ Invalid village.")
         return
     cook_scope = (village, color)
-    last = LAST_COOK_SECONDS.get(cook_scope, 0)
-    if seconds <= last:
+    last_village_change = VILLAGE_VERSION[village]
+    last_color_change = VILLAGE_COLOR_COUNT[(village, color)]
+    last_cook = LAST_COOK_SECONDS.get(cook_scope, 0)
+    if seconds <= last_cook:
         await interaction.edit_original_response(
-            content=f"❌ You must use a higher cook time than the previous run.\n"
-                    f"Current: **{seconds}s** | Required: **>{last}s**"
+            content=(
+                f"❌ You must use a higher cook time than the previous run.\n"
+                f"Current: **{seconds}s** | Required: **>{last_cook}s**"
+            )
         )
         return
+    if color == "all":
+        if seconds <= last_village_change:
+            await interaction.edit_original_response(
+                content=(
+                    f"❌ No new pearls detected.\n"
+                    f"Cook must be above: **{last_village_change}s**"
+                )
+            )
+            return
+    else:
+        if seconds <= last_color_change:
+            await interaction.edit_original_response(
+                content=(
+                    f"❌ No new colors detected.\n"
+                    f"Cook must be above: **{last_color_change}s**"
+                )
+            )
+            return
     refresh_data_cache = deps["refresh_data_cache"]
     require_channel = deps["require_channel"]
     generate_plot = deps["generate_plot"]
@@ -429,7 +461,10 @@ async def handle_cook(interaction: discord.Interaction, color: str, village: str
     data = current_data.get(village, [])
     data_hash = make_data_hash(data)
 
-    cache_key = (village, color.lower(), seconds, data_hash)
+    village_ver = VILLAGE_VERSION[village]
+    color_ver = VILLAGE_COLOR_VERSION[(village, color.lower())]
+
+    cache_key = (village, color.lower(), seconds, village_ver, color_ver)
 
     latest_cached = None
 
@@ -529,7 +564,10 @@ async def _cook_worker(interaction, village, safe_village, color, seconds, deps,
     refresh_data_cache = deps["refresh_data_cache"]
     cook_scope = (village, color.lower())
     LAST_COOK_SECONDS[cook_scope] = seconds
-    cache_key = (village, color.lower(), seconds, data_hash)
+    village_ver = VILLAGE_VERSION[village]
+    color_ver = VILLAGE_COLOR_VERSION[(village, color.lower())]
+
+    cache_key = (village, color.lower(), seconds, village_ver, color_ver)
 
     async def update_status(stage, remaining=None):
         state = COOKING.get(village)
