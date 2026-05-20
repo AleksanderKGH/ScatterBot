@@ -327,8 +327,8 @@ fig, ax = plt.subplots(figsize=(12.8, 12.8), dpi=100)
 fig.patch.set_alpha(0)
 ax.set_facecolor((0, 0, 0, 0))
 
-if bg is not None:
-    ax.imshow(bg, extent=[0, CANVAS_SIZE, 0, CANVAS_SIZE])
+#if bg is not None:
+#    ax.imshow(bg, extent=[0, CANVAS_SIZE, 0, CANVAS_SIZE])
 
 ax.plot(xs, ys, linewidth=LINE_WIDTH, color="white")
 ax.scatter(xs[:-1], ys[:-1], s=NODE_SIZE, color="white", edgecolors="black", linewidths=0.3)
