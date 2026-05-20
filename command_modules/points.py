@@ -12,6 +12,7 @@ import os
 import io
 import hashlib
 import shutil
+import sys
 #inder end
 
 from typing import Optional, List
@@ -541,9 +542,10 @@ async def _cook_worker(interaction, village, safe_village, color, seconds, deps,
 
     def run_render_sync(env, temp_dir):
         subprocess.run(
-            ["bash", "./tsp.sh"],
+            [sys.executable, "tsp.py"],
             cwd=os.getcwd(),
-            env=env
+            env=env,
+            check=True
         )
         return os.path.join(temp_dir, "route.png")
 
