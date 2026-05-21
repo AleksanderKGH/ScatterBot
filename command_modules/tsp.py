@@ -49,7 +49,7 @@ if COLOR_FILTER == "all":
 
 os.makedirs(OUTDIR, exist_ok=True)
 
-PNG = os.path.join(OUTDIR, "route.png")
+PNG = os.path.join(OUTDIR, f"{GROUP_FILE}.png")
 BENCH = os.path.join(OUTDIR, "benchmark.txt")
 
 # optional background (was $BG in bash)
