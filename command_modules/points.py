@@ -582,14 +582,14 @@ async def _cook_worker(interaction, village, safe_village, color, seconds, deps,
             msg += f"\n⏳ Time left: **{remaining}s / {seconds}s**"
         await interaction.edit_original_response(content=msg)
 
-    def run_render_sync(env, temp_dir):
+    def run_render_sync(env, temp_dir, safe_village):
         subprocess.run(
             [sys.executable, "command_modules/tsp.py"],
             cwd=os.getcwd(),
             env=env,
             check=True
         )
-        return os.path.join(temp_dir, "route.png")
+        return os.path.join(temp_dir, f"{safe_village}.png")
 
     try:
         plot_path = os.path.join(temp_dir, f"{safe_village}_bg.png")
@@ -614,7 +614,7 @@ async def _cook_worker(interaction, village, safe_village, color, seconds, deps,
 
         # 🚀 START BOTH IMMEDIATELY (NO DEPENDENCY)
         render_task = asyncio.create_task(
-            asyncio.to_thread(run_render_sync, env, temp_dir)
+            asyncio.to_thread(run_render_sync, env, temp_dir, safe_village)
         )
 
         countdown_task = asyncio.create_task(
