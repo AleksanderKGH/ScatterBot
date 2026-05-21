@@ -36,8 +36,12 @@ LAST_COOK_SECONDS: dict[tuple[str, str], int] = {}
 NEW_PEARL: dict[str, bool] = defaultdict(lambda: True)
 NEW_COLOR: dict[tuple[str, str], bool] = defaultdict(lambda: True)
 
+def normalize_village_key(v: str) -> str:
+    return v.strip().replace(" ", "_")
+
 async def handle_point(interaction: discord.Interaction, x: float, y: float, color: str, village: str, deps: dict):
-    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    village_raw = village.strip()
+    village = normalize_village_input(village_raw, config.VILLAGE_OPTIONS)
     if not village:
         await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
         return
@@ -195,7 +199,8 @@ async def handle_point(interaction: discord.Interaction, x: float, y: float, col
 
 
 async def handle_plot(interaction: discord.Interaction, village: str, deps: dict):
-    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    village_raw = village.strip()
+    village = normalize_village_input(village_raw, config.VILLAGE_OPTIONS)
     if not village:
         await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
         return
@@ -278,7 +283,8 @@ async def handle_plot(interaction: discord.Interaction, village: str, deps: dict
     #inder out
 
 async def handle_plot_detailed(interaction: discord.Interaction, village: str, deps: dict):
-    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    village_raw = village.strip()
+    village = normalize_village_input(village_raw, config.VILLAGE_OPTIONS)
     if not village:
         await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
         return
@@ -343,7 +349,8 @@ async def handle_villages(interaction: discord.Interaction, deps: dict):
 
 async def handle_undo(interaction: discord.Interaction, village: str, deps: dict):
 
-    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    village_raw = village.strip()
+    village = normalize_village_input(village_raw, config.VILLAGE_OPTIONS)
     if not village:
         await interaction.response.send_message("❌ Invalid village.", ephemeral=True)
         return
@@ -410,7 +417,8 @@ async def handle_cook(interaction: discord.Interaction, color: str, village: str
     safe_village = village.strip() if village else "Dogville"
     safe_village = safe_village.replace(" ", "_")
     await interaction.response.defer(ephemeral=True)
-    village = normalize_village_input(village, config.VILLAGE_OPTIONS)
+    village_raw = village.strip()
+    village = normalize_village_input(village_raw, config.VILLAGE_OPTIONS)
     color = (color or "all").strip().lower()
     if color in ("", "default", "all"):
         color = "all"
