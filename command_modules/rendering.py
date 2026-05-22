@@ -530,12 +530,14 @@ def generate_plot(
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.clear()
 
-    safe_village = village.replace(" ", "_")
+    safe_village = normalize_village_key(village)
     for ext in [".png", ".jpg", ".jpeg"]:
-        path = f"{safe_village}{ext}"
+        path = os.path.join(os.getcwd(), f"{safe_village}{ext}")
         if os.path.exists(path):
             try:
                 print(f"Attempting to load: {path}")
+                print("LOOKING FOR:", os.path.abspath(path))
+                print("EXISTS:", os.path.exists(path))
                 img = Image.open(path)
                 ax.imshow(
                     img,
