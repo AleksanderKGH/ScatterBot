@@ -18,6 +18,8 @@ mpl.rcParams.update({
     "figure.autolayout": False
 })
 
+def normalize_village_key(v: str) -> str:
+    return v.strip().replace(" ", "_")
 
 def normalize_house_size(footprint: dict, rotation: int) -> tuple[float, float]:
     width = footprint.get("width")
