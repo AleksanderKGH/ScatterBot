@@ -18,6 +18,8 @@ mpl.rcParams.update({
     "figure.autolayout": False
 })
 
+def normalize_village_key(v: str) -> str:
+    return v.strip().replace(" ", "_")
 
 def normalize_house_size(footprint: dict, rotation: int) -> tuple[float, float]:
     width = footprint.get("width")
@@ -530,12 +532,14 @@ def generate_plot(
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.clear()
 
-    safe_village = village.replace(" ", "_")
+    safe_village = normalize_village_key(village)
     for ext in [".png", ".jpg", ".jpeg"]:
-        path = f"{safe_village}{ext}"
+        path = os.path.join(os.getcwd(), f"{safe_village}{ext}")
         if os.path.exists(path):
             try:
                 print(f"Attempting to load: {path}")
+                print("LOOKING FOR:", os.path.abspath(path))
+                print("EXISTS:", os.path.exists(path))
                 img = Image.open(path)
                 ax.imshow(
                     img,
