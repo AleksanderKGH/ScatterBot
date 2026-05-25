@@ -46,6 +46,7 @@ DEFAULT_VILLAGES = [
     "Samurai Village",
     "Rosemary Road",
     "Little Lamb Loaves",
+    "Croissant Creek"
 ]
 
 # Load villages from environment or use defaults
