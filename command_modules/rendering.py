@@ -19,7 +19,7 @@ mpl.rcParams.update({
 })
 
 def normalize_village_key(v: str) -> str:
-    return v.strip().replace(" ", "_")
+    return v.strip()
 
 def normalize_house_size(footprint: dict, rotation: int) -> tuple[float, float]:
     width = footprint.get("width")
@@ -532,7 +532,25 @@ def generate_plot(
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.clear()
 
-    safe_village = normalize_village_key(village)
+    safe_village = normalize_village_key(village).strip().replace("__", "_")
+
+    cwd = os.getcwd()
+    print("LOOKING FOR VILLAGE IMAGE:", safe_village)
+    print("CWD:", cwd)
+
+    found = False
+    for ext in [".png", ".jpg", ".jpeg"]:
+        path = os.path.join(cwd, safe_village + ext)
+        print("TRY:", path)
+
+        if os.path.exists(path):
+            img = Image.open(path)
+            ax.imshow(img, extent=[160, -160, -160, 160], zorder=0)
+            found = True
+            break
+
+    if not found:
+        print("NO BACKGROUND FOUND")
     for ext in [".png", ".jpg", ".jpeg"]:
         path = os.path.join(os.getcwd(), f"{safe_village}{ext}")
         if os.path.exists(path):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import discord
 from discord import app_commands, Interaction
-
+from command_modules.pearldebt.debt_commands import PearlDebtCommands
 
 def register_commands(
     tree: app_commands.CommandTree,
@@ -188,3 +188,10 @@ def register_commands(
     @app_commands.describe(enabled="Enable incognito mode (hide from leaderboard)")
     async def incognito(interaction: discord.Interaction, enabled: bool):
         await admin_module.handle_incognito(interaction, enabled)
+
+    pearldebt = PearlDebtCommands(tree.client)
+
+    @tree.command(name="mapfunds", description="View or reduce pearl debt")
+    @app_commands.describe(user="User to reduce debt for",pearls="Amount of pearls to reduce")
+    async def mapfunds(interaction: discord.Interaction,user: discord.User = None,pearls: int = None):
+        await pearldebt.mapfunds.callback(pearldebt, interaction, user, pearls)
