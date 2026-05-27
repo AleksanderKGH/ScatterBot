@@ -20,6 +20,7 @@ from data import load_data, save_data
 from utils import get_point_data, get_point_user
 from views import ConfirmYesterdayView, UndoPointView
 from collections import defaultdict
+from command_modules.pearldebt.ledger import add_pearls_owed
 temp_dir = tempfile.gettempdir()
 
 PLOT_CACHE: dict[str, dict] = {}
@@ -718,9 +719,12 @@ def make_data_hash(data):
 
 def normalize_village_input(village: str, valid_villages: list[str]) -> Optional[str]:
     v = village.strip().lower()
+    # allow direct alias lookup (e.g. "capital" -> real name)
+    if v in VILLAGE_ALIASES: return VILLAGE_ALIASES[v]
     for real in valid_villages:
-        if real.lower() == v:
-            return real
+        r_norm = real.strip().lower()
+        if r_norm == v: return real
+        if r_norm.replace("_", " ") == v or r_norm.replace(" ", "_") == v: return real
     return None
 async def resolve_village(interaction: discord.Interaction, village: str, valid_villages: list[str]) -> Optional[str]:
     village = normalize_village_input(village, valid_villages)

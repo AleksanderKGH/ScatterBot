@@ -5,6 +5,7 @@ from datetime import datetime
 from discord.ext import tasks
 from config import TOKEN, LOG_CHANNEL_ID, GUILD_ID, PLOT_CHANNEL_ID, POINT_CHANNEL_ID
 from commands import register_commands, clear_all_points
+from command_modules.pearldebt.ledger import snapshot_pearldebt_before_reset
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -115,7 +116,7 @@ async def reset_loop():
     today = datetime.utcnow().strftime("%Y-%m-%d")
     if last_reset_date == today:
         return
-
+    snapshot_pearldebt_before_reset()
     _, goats, daily_stats = clear_all_points()
     await send_reset_messages(goats, daily_stats)
     last_reset_date = today
