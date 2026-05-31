@@ -42,7 +42,11 @@ DEFAULT_VILLAGES = [
     "Honey Wheat Hallow",
     "Yeastopia",
     "Harvesta",
-    "Kitsune Ville"
+    "Kitsune Ville",
+    "Samurai Village",
+    "Rosemary Road",
+    "Little Lamb Loaves",
+    "Croissant Creek"
 ]
 
 # Load villages from environment or use defaults
