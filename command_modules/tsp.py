@@ -6,6 +6,8 @@ import math
 import random
 import time
 import os
+print("RUNNING TSP:", os.path.abspath(__file__))
+import tempfile
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -56,22 +58,40 @@ BENCH = os.path.join(OUTDIR, "benchmark.txt")
 # optional background (was $BG in bash)
 BG = os.environ.get("BG", "")
 
-CACHE_FILE = os.path.join(OUTDIR, "cook_cache.json")
+CACHE_FILE = os.path.join(OUTDIR, f"cook_cache_{GROUP_FILE}.json")
 
 def load_cook_cache():
-    if os.path.exists(CACHE_FILE):
-        try:
-            with open(CACHE_FILE, "r") as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+    if not os.path.exists(CACHE_FILE):
+        return {}
+    try:
+        with open(CACHE_FILE, "r") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print("⚠️ cook_cache.json corrupted — resetting")
+        return {}
+    except Exception as e:
+        print("⚠️ cache load error:", e)
+        return {}
 
 def save_cook_cache(cache):
-    tmp = CACHE_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(cache, f)
-    os.replace(tmp, CACHE_FILE)
+    dir_name = os.path.dirname(CACHE_FILE)
+
+    fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix="cook_cache_", suffix=".json")
+
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(cache, f)
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.replace(tmp_path, CACHE_FILE)
+
+    except Exception as e:
+        print("⚠️ cache save failed:", e)
+        try:
+            os.remove(tmp_path)
+        except:
+            pass
 
 # =========================
 # 1/3 EXTRACT POINTS
@@ -100,7 +120,7 @@ RAW = [
 
 N = len(RAW)
 
-cache_key = f"{GROUP}|{COLOR_FILTER}|{INPUT}"
+cache_key = f"{GROUP}|{COLOR_FILTER}|{hash(json.dumps(points, sort_keys=True))}"
 cached = COOK_CACHE.get(cache_key)
 
 if cached:

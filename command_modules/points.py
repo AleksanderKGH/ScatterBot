@@ -21,7 +21,7 @@ from utils import get_point_data, get_point_user
 from views import ConfirmYesterdayView, UndoPointView
 from collections import defaultdict
 from command_modules.pearldebt.ledger import add_pearls_owed
-temp_dir = tempfile.gettempdir()
+temp_dir = tempfile.mkdtemp(prefix="scatterbot_")
 
 PLOT_CACHE: dict[str, dict] = {}
 COOK_CACHE: dict[tuple, dict] = {}
@@ -710,7 +710,7 @@ async def _cook_worker(interaction, village, safe_village, color, seconds, deps,
         if state and state.get("job_id") == job_id:
             del COOKING[village]
 
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        pass
 
 def make_data_hash(data):
     return hashlib.md5(
