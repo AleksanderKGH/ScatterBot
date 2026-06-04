@@ -46,15 +46,17 @@ DEFAULT_VILLAGES = [
     "Samurai Village",
     "Rosemary Road",
     "Little Lamb Loaves",
-    "Croissant Creek"
 ]
 
 # Load villages from environment or use defaults
 villages_env = os.getenv("VILLAGES")
+
+VILLAGE_OPTIONS = DEFAULT_VILLAGES.copy()
+
 if villages_env:
-    VILLAGE_OPTIONS = [v.strip() for v in villages_env.split(",") if v.strip()]
-else:
-    VILLAGE_OPTIONS = DEFAULT_VILLAGES
+    for village in [v.strip() for v in villages_env.split(",") if v.strip()]:
+        if village not in VILLAGE_OPTIONS:
+            VILLAGE_OPTIONS.append(village)
 
 COLOR_OPTIONS = ["Black", "Blue", "Cyan", "Green", "Magenta", "Red", "White", "Yellow"]
 PLOT_COLORS = {
