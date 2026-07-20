@@ -65,6 +65,7 @@ def clean_backups(backups_dir: Path, dry_run: bool = False) -> None:
     alias_moves: dict[str, int] = defaultdict(int)
     alias_targets: dict[str, str] = {}
     dropped_counts: dict[str, int] = defaultdict(int)
+    empty_village_drops = 0
 
     for path in files:
         data = _load_json(path)
@@ -73,13 +74,18 @@ def clean_backups(backups_dir: Path, dry_run: bool = False) -> None:
         changed = False
 
         for village, points in data.items():
+            points_list = points if isinstance(points, list) else []
             normalized_key = _normalize_village_key(village)
             canonical_target = CANONICAL_BY_NORMALIZED.get(normalized_key)
 
             if canonical_target:
+                if not points_list:
+                    empty_village_drops += 1
+                    changed = True
+                    continue
                 if canonical_target not in cleaned:
                     cleaned[canonical_target] = []
-                cleaned[canonical_target].extend(points if isinstance(points, list) else [])
+                cleaned[canonical_target].extend(points_list)
                 if canonical_target != village:
                     alias_moves[village] += 1
                     alias_targets[village] = canonical_target
@@ -88,9 +94,13 @@ def clean_backups(backups_dir: Path, dry_run: bool = False) -> None:
 
             alias_target = ALIASES_BY_NORMALIZED.get(normalized_key)
             if alias_target:
+                if not points_list:
+                    empty_village_drops += 1
+                    changed = True
+                    continue
                 if alias_target not in cleaned:
                     cleaned[alias_target] = []
-                cleaned[alias_target].extend(points if isinstance(points, list) else [])
+                cleaned[alias_target].extend(points_list)
                 alias_moves[village] += 1
                 alias_targets[village] = alias_target
                 changed = True
@@ -121,6 +131,8 @@ def clean_backups(backups_dir: Path, dry_run: bool = False) -> None:
             print(f"  {village}: {count}")
     else:
         print("No unknown village keys found.")
+
+    print(f"Dropped empty village entries: {empty_village_drops}")
 
 
 def main() -> None:

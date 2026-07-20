@@ -67,6 +67,10 @@ def _sanitize_backup_data(data: dict) -> tuple[dict[str, list], list[str]]:
             rejected_keys.append(village)
             continue
 
+        if not points:
+            # Skip villages with no points to keep backups compact.
+            continue
+
         if village_key not in cleaned:
             cleaned[village_key] = []
         cleaned[village_key].extend(points)
